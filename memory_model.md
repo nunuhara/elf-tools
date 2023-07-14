@@ -8,18 +8,17 @@ AI5WIN uses a 16-bit address space layed out according to the following struct:
 ```c
 struct mem16 {
     char mes_name[128];
-    int8_t var4[4096];
+    int8_t var4[NR_VAR4];
     int16_t *system_var16_ptr;
     int16_t var16[26];
-    int16_t system_var16[24];
-    int32_t var32[27];
-    int32_t system_var32[27];
-    int8_t rest[3648];
+    int16_t system_var16[26];
+    int32_t var32[26];
+    int32_t system_var32[26];
+    int8_t heap[HEAP_SIZE];
 };
 ```
 
-The total size of this address space is 8192 bytes. In YU-NO (elf Classics
-version), it is initialized as follows:
+In YU-NO (elf Classics version), it is initialized as follows:
 
 ```c
 void init_mem16(struct mem16 *mem)
@@ -54,18 +53,21 @@ void init_mem16(struct mem16 *mem)
 `mes_name` contains the currently executing .mes file name.
 
 `var4` is an array of 4-bit variables (the top 4 bits of each byte are masked
-off and unused).
+off and unused). The size of this array varies by game. I have observed sizes
+of 2048 and 4096.
 
 `system_var16_ptr` is (initially) a pointer to `system_var16`.
 
 `var16` is an array of 16-bit variables. When a value in this array is used as
-a pointer, it is an offset into the 16-bit address space.
+a pointer, it is an offset into the 16-bit address space. These variables are
+named according to the letters of the alphabet, from A to Z.
 
 `system_var16` is an array of 16-bit variables which are used by the VM. They
 can be modified to alter the VM's behavior.
 
 `var32` is an array of 32-bit variables. When a value in this array is used as
-a pointer, it is a pointer into the VM's own address space.
+a pointer, it is a pointer into the VM's own address space. These variables
+are named according to the letters of the alphabet, from dwA to dwZ.
 
 `system_var32` is an array of 32-bit variables which are used by the VM. Many
 are pointers to VM structures, such as the palette colors, or to the start of
