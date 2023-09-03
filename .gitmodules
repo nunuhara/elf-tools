@@ -1,0 +1,3 @@
+[submodule "subprojects/nulib"]
+	path = subprojects/nulib
+	url = git@github.com:nunuhara/nulib.git
