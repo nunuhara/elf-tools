@@ -46,7 +46,7 @@ struct command cmd_mes = {
 	.description = "Tools for compiling and decompiling .mes files",
 	.parent = &cmd_elf,
 	.commands = {
-		//&cmd_mes_compile,
+		&cmd_mes_compile,
 		&cmd_mes_decompile,
 		NULL
 	}

@@ -332,6 +332,16 @@ static enum mes_expression_op parse_expr_op(uint8_t op)
 	return op_tables.int_to_expr_op[op];
 }
 
+uint8_t mes_stmt_opcode(enum mes_statement_op op)
+{
+	return op_tables.stmt_op_to_int[op];
+}
+
+uint8_t mes_expr_opcode(enum mes_expression_op op)
+{
+	return op_tables.expr_op_to_int[op];
+}
+
 static struct mes_expression *stack_pop(unsigned addr, struct mes_expression **stack, int *stack_ptr)
 {
 	if (unlikely(*stack_ptr < 1)) {
@@ -397,8 +407,8 @@ static struct mes_expression *mes_parse_expression(struct buffer *mes)
 				//         Kakyuusei (1998 CD version)
 				//         Kawarazaki-ke (1997 CD version)
 				expr->sub_a = xcalloc(1, sizeof(struct mes_expression));
-				expr->op = MES_EXPR_IMM16;
-				expr->arg16 = buffer_read_u16(mes);
+				expr->sub_a->op = MES_EXPR_IMM16;
+				expr->sub_a->arg16 = buffer_read_u16(mes);
 			} else {
 				if (!(expr->sub_a = stack_pop(mes->index-1, stack, &stack_ptr)))
 					goto error;
@@ -475,6 +485,57 @@ error:
 	return false;
 }
 
+static bool mes_parse_string_param(struct buffer *mes, struct mes_parameter *param)
+{
+	// XXX: Actual max size of string parameter is 24, but the VM doesn't
+	//      bounds check and the limit is exceeded in some cases (e.g.
+	//      Doukyuusei/NAME.MES).
+	char str[64];
+	size_t str_i = 0;
+	bool warned_overflow = false;
+
+	uint8_t c;
+	for (str_i = 0; (c = buffer_read_u8(mes)); str_i++) {
+		if (unlikely(str_i > 61)) {
+			DC_ERROR(mes->index, "string parameter overflowed parse buffer");
+			return false;
+		}
+		if (unlikely(str_i > 22 && !warned_overflow)) {
+			DC_WARNING(mes->index, "string parameter would overflow VM buffer");
+			warned_overflow = true;
+		}
+		switch (c) {
+		case '\\':
+			str[str_i++] = '\\';
+			str[str_i] = '\\';
+			break;
+		case '\n':
+			str[str_i++] = '\\';
+			str[str_i] = 'n';
+			break;
+		case '\t':
+			str[str_i++] = '\\';
+			str[str_i] = 't';
+			break;
+		default:
+			// TODO: \x
+			str[str_i] = c;
+			if (SJIS_2BYTE(c)) {
+				if (!(c = buffer_read_u8(mes))) {
+					DC_WARNING(mes->index, "string parameter truncated");
+					mes->index--;
+					break;
+				}
+				str[++str_i] = c;
+			}
+			break;
+		}
+	}
+	str[str_i] = '\0';
+	param->str = sjis_cstring_to_utf8(str, str_i);
+	return true;
+}
+
 static bool mes_parse_parameter_list(struct buffer *mes, mes_parameter_list *params)
 {
 	vector_init(*params);
@@ -483,22 +544,8 @@ static bool mes_parse_parameter_list(struct buffer *mes, mes_parameter_list *par
 	for (int i = 0; (b = buffer_read_u8(mes)); i++) {
 		vector_push(struct mes_parameter, *params, (struct mes_parameter){.type=b});
 		if (b == MES_PARAM_STRING) {
-			uint8_t c;
-			int str_i;
-			char *str = vector_A(*params, i).str;
-			bool warned_overflow = false;
-			for (str_i = 0; (c = buffer_read_u8(mes)); str_i++) {
-				if (unlikely(str_i > 62)) {
-					DC_ERROR(mes->index, "string parameter overflowed parse buffer");
-					goto error;
-				}
-				if (unlikely(str_i > 22 && !warned_overflow)) {
-					DC_WARNING(mes->index, "string parameter would overflow VM buffer");
-					warned_overflow = true;
-				}
-				str[str_i] = c;
-			}
-			str[str_i] = '\0';
+			if (!mes_parse_string_param(mes, &vector_A(*params, i)))
+				goto error;
 		} else if (b == MES_PARAM_EXPRESSION) {
 			struct mes_expression *expr = mes_parse_expression(mes);
 			if (!expr)
@@ -511,10 +558,10 @@ static bool mes_parse_parameter_list(struct buffer *mes, mes_parameter_list *par
 	}
 	return true;
 error:
-	struct mes_parameter p;
-	vector_foreach(p, *params) {
-		if (p.type == MES_PARAM_EXPRESSION && p.expr)
-			mes_expression_free(p.expr);
+	struct mes_parameter *p;
+	vector_foreach_p(p, *params) {
+		if (p->type == MES_PARAM_EXPRESSION && p->expr)
+			mes_expression_free(p->expr);
 	}
 	vector_destroy(*params);
 	vector_init(*params);
@@ -526,12 +573,12 @@ static bool in_range(int v, int low, int high)
 	return v >= low && v <= high;
 }
 
-static bool is_hankaku(uint8_t b)
+bool mes_char_is_hankaku(uint8_t b)
 {
 	return !in_range(b, 0x81, 0x9f) && !in_range(b, 0xe0, 0xef);
 }
 
-static bool is_zenkaku(uint8_t b)
+bool mes_char_is_zenkaku(uint8_t b)
 {
 	return in_range(b, 0x81, 0x9f) || in_range(b, 0xe0, 0xef) || in_range(b, 0xfa, 0xfc);
 }
@@ -550,7 +597,7 @@ static string mes_parse_txt(struct buffer *mes, bool *terminated)
 			DC_ERROR(mes->index, "TXT buffer overflow");
 			return NULL;
 		}
-		if (unlikely(!is_zenkaku(c))) {
+		if (unlikely(!mes_char_is_zenkaku(c))) {
 			DC_WARNING(mes->index, "Invalid byte in TXT statement: %02x", (unsigned)c);
 			*terminated = false;
 			goto unterminated;
@@ -583,7 +630,7 @@ static string mes_parse_str(struct buffer *mes, bool *terminated)
 			DC_ERROR(mes->index, "STR buffer overflow");
 			return NULL;
 		}
-		if (unlikely(!is_hankaku(c))) {
+		if (unlikely(!mes_char_is_hankaku(c))) {
 			DC_WARNING(mes->index, "Invalid byte in STR statement: %02x", (unsigned)c);
 			*terminated = false;
 			goto unterminated;
@@ -621,7 +668,6 @@ unterminated:
 	return sjis_cstring_to_utf8(str, str_i);
 }
 
-#include "nulib/port.h"
 static struct mes_statement *mes_parse_statement(struct buffer *mes)
 {
 	struct mes_statement *stmt = xcalloc(1, sizeof(struct mes_statement));
@@ -756,7 +802,7 @@ static struct mes_statement *mes_parse_statement(struct buffer *mes)
 	default:
 		mes->index--;
 		DC_WARNING(mes->index, "Unprefixed text: 0x%02x (possibly unhandled statement)", b);
-		if (is_hankaku(buffer_peek_u8(mes))) {
+		if (mes_char_is_hankaku(buffer_peek_u8(mes))) {
 			stmt->op = MES_STMT_STR;
 			if (!(stmt->TXT.text = mes_parse_str(mes, &stmt->TXT.terminated)))
 				goto error;
@@ -769,9 +815,6 @@ static struct mes_statement *mes_parse_statement(struct buffer *mes)
 		}
 	}
 	stmt->next_address = mes->index;
-	//port_printf(port_stdout(), "L_%08x:\n", stmt->address);
-	//mes_statement_print(stmt, port_stdout());
-	//fflush(stdout);
 	return stmt;
 error:
 	free(stmt);
@@ -877,6 +920,8 @@ void mes_parameter_list_free(mes_parameter_list list)
 	for (unsigned i = 0; i < vector_length(list); i++) {
 		if (vector_A(list, i).type == MES_PARAM_EXPRESSION)
 			mes_expression_free(vector_A(list, i).expr);
+		else
+			string_free(vector_A(list, i).str);
 	}
 	vector_destroy(list);
 }
@@ -963,4 +1008,15 @@ void mes_statement_list_free(mes_statement_list list)
 		mes_statement_free(vector_A(list, i));
 	}
 	vector_destroy(list);
+}
+
+void mes_qname_free(mes_qname name)
+{
+	struct mes_qname_part *p;
+	vector_foreach_p(p, name) {
+		if (p->type == MES_QNAME_IDENT) {
+			string_free(p->ident);
+		}
+	}
+	vector_destroy(name);
 }

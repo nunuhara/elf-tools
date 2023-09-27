@@ -94,6 +94,33 @@ enum mes_expression_op {
 	MES_EXPR_END = 0xFF
 };
 
+enum mes_system_var16 {
+	MES_SYS_VAR_FLAGS = 2,
+	MES_SYS_VAR_TEXT_HOME_X = 5,
+	MES_SYS_VAR_TEXT_HOME_Y = 6,
+	MES_SYS_VAR_WIDTH = 7,
+	MES_SYS_VAR_HEIGHT = 8,
+	MES_SYS_VAR_TEXT_CURSOR_X = 9,
+	MES_SYS_VAR_TEXT_CURSOR_Y = 10,
+	MES_SYS_VAR_FONT_WIDTH = 12,
+	MES_SYS_VAR_FONT_HEIGHT = 13,
+	MES_SYS_VAR_FONT_WIDTH2 = 15,
+	MES_SYS_VAR_FONT_HEIGHT2 = 16,
+	MES_SYS_VAR_MASK_COLOR = 23,
+};
+
+enum mes_system_var32 {
+	MES_SYS_VAR_MEMORY = 0,
+	MES_SYS_VAR_PALETTE = 5,
+	MES_SYS_VAR_FILE_DATA = 7,
+	MES_SYS_VAR_MENU_ENTRY_ADDRESSES = 8,
+	MES_SYS_VAR_MENU_ENTRY_NUMBERS = 9,
+};
+
+#define MES_NR_SYSTEM_VARIABLES 26
+extern const char *mes_system_var16_names[MES_NR_SYSTEM_VARIABLES];
+extern const char *mes_system_var32_names[MES_NR_SYSTEM_VARIABLES];
+
 enum mes_parameter_type {
 	MES_PARAM_STRING = 1,
 	MES_PARAM_EXPRESSION = 2,
@@ -115,16 +142,20 @@ struct mes_expression {
 struct mes_parameter {
 	enum mes_parameter_type type;
 	union {
-		// XXX: Actual max size of string parameter is 24, but the VM doesn't
-		//      bounds check and the limit is exceeded in some cases (e.g.
-		//      Doukyuusei/NAME.MES).
-		char str[64];
+		string str;
 		struct mes_expression *expr;
 	};
 };
 
 typedef vector_t(struct mes_expression*) mes_expression_list;
 typedef vector_t(struct mes_parameter) mes_parameter_list;
+
+struct mes_qname_part {
+	enum { MES_QNAME_IDENT, MES_QNAME_NUMBER } type;
+	union { string ident; unsigned number; };
+};
+
+typedef vector_t(struct mes_qname_part) mes_qname;
 
 struct mes_statement {
 	enum mes_statement_op op;
@@ -324,7 +355,11 @@ struct mes_ast {
 
 struct port;
 
+bool mes_char_is_hankaku(uint8_t b);
+bool mes_char_is_zenkaku(uint8_t b);
+
 bool mes_parse_statements(uint8_t *data, size_t data_size, mes_statement_list *statements);
+void mes_qname_free(mes_qname name);
 void mes_expression_free(struct mes_expression *expr);
 void mes_parameter_list_free(mes_parameter_list list);
 void mes_statement_free(struct mes_statement *stmt);
@@ -341,6 +376,8 @@ void mes_expression_list_print(mes_expression_list list, struct port *out);
 void mes_parameter_print(struct mes_parameter *param, struct port *out);
 void mes_parameter_list_print(mes_parameter_list list, struct port *out);
 void mes_statement_print(struct mes_statement *stmt, struct port *out);
+void mes_asm_statement_list_print(mes_statement_list statements, struct port *out);
+void mes_flat_statement_list_print(mes_statement_list statements, struct port *out);
 void mes_statement_list_print(mes_statement_list statements, struct port *out);
 void mes_ast_print(struct mes_ast *node, struct port *out);
 void mes_ast_block_print(mes_ast_block block, struct port *out);
@@ -350,5 +387,12 @@ void mes_block_tree_print(mes_block_list blocks, struct port *out);
 
 enum game_id;
 void mes_set_game(enum game_id id);
+uint8_t mes_stmt_opcode(enum mes_statement_op op);
+uint8_t mes_expr_opcode(enum mes_expression_op op);
+
+mes_statement_list mes_flat_parse(const char *path);
+mes_parameter_list mes_resolve_syscall(mes_qname name, int *no);
+int mes_resolve_sysvar(string name, bool *dword);
+uint8_t *mes_pack(mes_statement_list stmts, size_t *size_out);
 
 #endif // ELF_TOOLS_MES_H

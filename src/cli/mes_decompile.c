@@ -101,7 +101,7 @@ int cli_mes_decompile(int argc, char *argv[])
 		mes_statement_list statements = vector_initializer;
 		if (!(mes_parse_statements(mes, mes_size, &statements)))
 			sys_error("Failed to parse .mes file \"%s\".\n", argv[0]);
-		mes_statement_list_print(statements, &out);
+		mes_flat_statement_list_print(statements, &out);
 		mes_statement_list_free(statements);
 	} else if (mode == DECOMPILE_BLOCKS) {
 		mes_block_list toplevel = vector_initializer;
