@@ -29,4 +29,6 @@ enum game_id {
 
 extern enum game_id target_game;
 
+enum game_id parse_game_id(const char *str);
+
 #endif // ELF_TOOLS_GAME_H_

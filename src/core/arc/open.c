@@ -69,26 +69,32 @@ static bool read_u8_at(FILE *fp, off_t offset, uint8_t *out)
 	return true;
 }
 
-static bool archive_read_index(FILE *fp, struct archive *arc, off_t arc_size)
+bool archive_get_metadata(FILE *fp, struct arc_metadata *meta_out)
 {
-	// read file count
-	uint32_t nr_files;
-	if (!read_u32(fp, &nr_files))
+	struct arc_metadata meta = {0};
+
+	// get size of archive
+	if (fseek(fp, 0, SEEK_END)) {
+		WARNING("fseek: %s", strerror(errno));
 		return false;
-	if (nr_files > MAX_SANE_FILES) {
-		WARNING("archive file count is not sane: %u", nr_files);
+	}
+	meta.arc_size = ftell(fp);
+	if (fseek(fp, 0, SEEK_SET)) {
+		WARNING("fseek: %s", strerror(errno));
 		return false;
 	}
 
-	// determine encryption scheme
+	if (!read_u32(fp, &meta.nr_files))
+		return false;
+	if (meta.nr_files > MAX_SANE_FILES) {
+		WARNING("archive file count is not sane: %u", meta.nr_files);
+		return false;
+	}
+
 	const unsigned name_lengths[] = { 0x14, 0x1e, 0x20, 0x100 };
-	uint32_t name_length = 0;
-	uint32_t offset_key = 0;
-	uint32_t size_key = 0;
-	uint8_t name_key = 0;
 	for (int i = 0; i < ARRAY_SIZE(name_lengths); i++) {
 		uint32_t first_size, first_offset, second_offset;
-		if (!read_u8_at(fp, 3 + name_lengths[i], &name_key))
+		if (!read_u8_at(fp, 3 + name_lengths[i], &meta.name_key))
 			return false;
 		if (!read_u32_at(fp, 4 + name_lengths[i], &first_size))
 			return false;
@@ -97,27 +103,34 @@ static bool archive_read_index(FILE *fp, struct archive *arc, off_t arc_size)
 		if (!read_u32_at(fp, (off_t)(8 + name_lengths[i]) * 2, &second_offset))
 			return false;
 
-		uint32_t data_offset = (name_lengths[i] + 8) * nr_files + 4;
-		offset_key = data_offset ^ first_offset;
-		second_offset ^= offset_key;
-		if (second_offset < data_offset || second_offset >= arc_size)
+		uint32_t data_offset = (name_lengths[i] + 8) * meta.nr_files + 4;
+		meta.offset_key = data_offset ^ first_offset;
+		second_offset ^= meta.offset_key;
+		if (second_offset < data_offset || second_offset >= meta.arc_size)
 			continue;
 
-		size_key = (second_offset - data_offset) ^ first_size;
-		if (offset_key && size_key) {
-			name_length = name_lengths[i];
+		meta.size_key = (second_offset - data_offset) ^ first_size;
+		if (meta.offset_key && meta.size_key) {
+			meta.name_length = name_lengths[i];
 			break;
 		}
 	}
-	if (!name_length)
+	if (!meta.name_length)
 		return false;
 
+	*meta_out = meta;
+	return true;
+}
+
+static bool archive_read_index(FILE *fp, struct archive *arc)
+{
+	const struct arc_metadata *meta = &arc->meta;
 	if (fseek(fp, 4, SEEK_SET)) {
 		WARNING("fseek: %s", strerror(errno));
 		return false;
 	}
 
-	const size_t buf_len = (size_t)nr_files * (name_length + 8);
+	const size_t buf_len = (size_t)meta->nr_files * (meta->name_length + 8);
 	size_t buf_pos = 0;
 	uint8_t *buf = xmalloc(buf_len);
 	if (fread(buf, buf_len, 1, fp) != 1) {
@@ -127,21 +140,22 @@ static bool archive_read_index(FILE *fp, struct archive *arc, off_t arc_size)
 
 	// read file entries
 	vector_init(arc->files);
-	vector_resize(struct archive_data, arc->files, nr_files);
-	for (int i = 0; i < nr_files; i++) {
+	vector_resize(struct archive_data, arc->files, meta->nr_files);
+	for (int i = 0; i < meta->nr_files; i++) {
 		// decode file name
-		for (int j = 0; j < name_length; j++) {
-			buf[buf_pos + j] ^= name_key;
+		for (int j = 0; j < meta->name_length; j++) {
+			buf[buf_pos + j] ^= meta->name_key;
 			if (buf[buf_pos + j] == 0)
 				break;
 		}
-		buf[buf_pos + name_length - 1] = 0;
+		buf[buf_pos + meta->name_length - 1] = 0;
 
-		uint32_t offset = le_get32(buf, buf_pos + name_length + 4) ^ offset_key;
-		uint32_t raw_size = le_get32(buf, buf_pos + name_length) ^ size_key;
+		uint32_t offset = le_get32(buf, buf_pos + meta->name_length + 4) ^ meta->offset_key;
+		uint32_t raw_size = le_get32(buf, buf_pos + meta->name_length) ^ meta->size_key;
 		string name = sjis_cstring_to_utf8((char*)buf + buf_pos, 0);
-		if (offset + raw_size > arc_size) {
-			ERROR("%s @ %u + %u extends beyond EOF (%u)", name, offset, raw_size, (unsigned)arc_size);
+		if (offset + raw_size > meta->arc_size) {
+			ERROR("%s @ %u + %u extends beyond EOF (%u)", name, offset, raw_size,
+					(unsigned)meta->arc_size);
 		}
 
 		// store entry
@@ -153,7 +167,7 @@ static bool archive_read_index(FILE *fp, struct archive *arc, off_t arc_size)
 			.ref = 0,
 			.archive = arc
 		};
-		buf_pos += name_length + 8;
+		buf_pos += meta->name_length + 8;
 	}
 	free(buf);
 
@@ -184,19 +198,12 @@ struct archive *archive_open(const char *path, unsigned flags)
 		goto error;
 	}
 
-	// get size of archive
-	if (fseek(fp, 0, SEEK_END)) {
-		WARNING("fseek: %s", strerror(errno));
-		goto error;
-	}
-	off_t arc_size = ftell(fp);
-	if (fseek(fp, 0, SEEK_SET)) {
-		WARNING("fseek: %s", strerror(errno));
+	if (!archive_get_metadata(fp, &arc->meta)) {
+		WARNING("failed to ared archive metadata");
 		goto error;
 	}
 
-	// read file index
-	if (!archive_read_index(fp, arc, arc_size)) {
+	if (!archive_read_index(fp, arc)) {
 		goto error;
 	}
 
@@ -207,8 +214,8 @@ struct archive *archive_open(const char *path, unsigned flags)
 			WARNING("fileno: %s", strerror(errno));
 			goto error;
 		}
-		arc->map.data = mmap(0, arc_size, PROT_READ, MAP_SHARED, fd, 0);
-		arc->map.size = arc_size;
+		arc->map.data = mmap(0, arc->meta.arc_size, PROT_READ, MAP_SHARED, fd, 0);
+		arc->map.size = arc->meta.arc_size;
 		if (arc->map.data == MAP_FAILED) {
 			WARNING("mmap: %s", strerror(errno));
 			goto error;
@@ -222,6 +229,7 @@ struct archive *archive_open(const char *path, unsigned flags)
 		arc->fp = fp;
 	}
 
+	arc->flags = flags;
 	return arc;
 error:
 	vector_destroy(arc->files);
@@ -246,6 +254,34 @@ void archive_close(struct archive *arc)
 	vector_destroy(arc->files);
 	hashtable_destroy(arcindex, &arc->index);
 	free(arc);
+}
+
+/*
+ * Decompress compressed file types.
+ */
+static bool data_decompress(struct archive_data *data)
+{
+	const char *ext = file_extension(data->name);
+	static const char *compressed_ext[] = { "mes", "lib", "a", "a6", "msk", "x" };
+	for (unsigned i = 0; i < ARRAY_SIZE(compressed_ext); i++) {
+		if (strcasecmp(ext, compressed_ext[i]))
+			continue;
+		size_t decompressed_size;
+		uint8_t *tmp = lzss_decompress(data->data, data->raw_size, &decompressed_size);
+		if (!data->mapped)
+			free(data->data);
+		data->mapped = false;
+		if (!tmp) {
+			WARNING("lzss_decompress failed");
+			data->data = NULL;
+			data->size = 0;
+			return false;
+		}
+		data->data = tmp;
+		data->size = decompressed_size;
+		break;
+	}
+	return true;
 }
 
 bool archive_data_load(struct archive_data *data)
@@ -277,42 +313,30 @@ bool archive_data_load(struct archive_data *data)
 		data->size = data->raw_size;
 	}
 
-	// decompress compessed file types
-	const char *ext = file_extension(data->name);
-	static const char *compressed_ext[] = { "mes", "lib", "a", "a6", "msk", "x" };
-	for (unsigned i = 0; i < ARRAY_SIZE(compressed_ext); i++) {
-		if (strcasecmp(ext, compressed_ext[i]))
-			continue;
-		size_t decompressed_size;
-		uint8_t *tmp = lzss_decompress(data->data, data->raw_size, &decompressed_size);
-		if (!data->mapped)
-			free(data->data);
-		data->mapped = false;
-		if (!tmp) {
-			WARNING("lzss_decompress failed");
-			data->data = NULL;
-			data->size = 0;
-			return false;
-		}
-		data->data = tmp;
-		data->size = decompressed_size;
-		break;
-	}
+	if (!(data->archive->flags & ARCHIVE_RAW) && !data_decompress(data))
+		return false;
 
 	data->ref = 1;
 	return true;
 }
 
-struct archive_data *archive_get(struct archive *arc, const char *name)
+int archive_get_index(struct archive *arc, const char *name)
 {
 	hashtable_iter_t k = hashtable_get(arcindex, &arc->index, name);
-	if (k == hashtable_end(&arc->index)) {
+	if (k == hashtable_end(&arc->index))
+		return -1;
+	return hashtable_val(&arc->index, k);
+}
+
+struct archive_data *archive_get(struct archive *arc, const char *name)
+{
+	int i = archive_get_index(arc, name);
+	if (i < 0)
 		return NULL;
-	}
 
 	// XXX: Because we're giving out pointers into arc->files, the vector must
 	//      never be resized.
-	struct archive_data *data = &vector_A(arc->files, hashtable_val(&arc->index, k));
+	struct archive_data *data = &vector_A(arc->files, i);
 	if (archive_data_load(data))
 		return data;
 	return NULL;

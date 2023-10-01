@@ -18,7 +18,7 @@ bisongen = generator(bison,
 incdirs = include_directories('include')
 
 sources = [
-  'src/core/arc.c',
+  'src/core/arc/open.c',
   'src/core/mes/decompile.c',
   'src/core/mes/flat_parser.c',
   'src/core/mes/pack.c',
@@ -27,6 +27,9 @@ sources = [
   'src/core/mes/system.c',
   'src/cli/arc_extract.c',
   'src/cli/arc_list.c',
+  'src/cli/arc_pack.c',
+  'src/cli/lzss_compress.c',
+  'src/cli/lzss_decompress.c',
   'src/cli/main.c',
   'src/cli/mes_compile.c',
   'src/cli/mes_decompile.c'
@@ -34,6 +37,9 @@ sources = [
 
 sources += flexgen.process('src/core/mes/flat_lexer.l')
 sources += bisongen.process('src/core/mes/flat_parser.y')
+
+sources += flexgen.process('src/core/arc/manifest_lexer.l')
+sources += bisongen.process('src/core/arc/manifest_parser.y')
 
 executable('elf', sources,
   dependencies : nulib_dep,

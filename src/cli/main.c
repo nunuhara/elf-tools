@@ -35,7 +35,19 @@ struct command cmd_arc = {
 	.commands = {
 		&cmd_arc_extract,
 		&cmd_arc_list,
-		//&cmd_arc_pack,
+		&cmd_arc_pack,
+		NULL
+	}
+};
+
+struct command cmd_lzss = {
+	.name = "lzss",
+	.usage = "<command> ...",
+	.description = "Tools for compressing and decompressing files with LZSS",
+	.parent = &cmd_elf,
+	.commands = {
+		&cmd_lzss_compress,
+		&cmd_lzss_decompress,
 		NULL
 	}
 };
@@ -59,6 +71,7 @@ struct command cmd_elf = {
 	.parent = NULL,
 	.commands = {
 		&cmd_arc,
+		&cmd_lzss,
 		&cmd_mes,
 		NULL
 	}
@@ -80,7 +93,7 @@ static struct game_name game_names[] = {
 	{ "yuno",       GAME_ELF_CLASSICS, "この世の果てで恋を唄う少女YU-NO (エルフclassics)" },
 };
 
-static enum game_id parse_game_id(const char *str)
+enum game_id parse_game_id(const char *str)
 {
 	for (unsigned i = 0; i < ARRAY_SIZE(game_names); i++) {
 		if (!strcmp(str, game_names[i].name))

@@ -29,12 +29,24 @@
 declare_hashtable_string_type(arcindex, int);
 
 enum {
-	ARCHIVE_MMAP = 1
+	ARCHIVE_MMAP = 1, // map archive in memory
+	ARCHIVE_RAW  = 2, // skip decompression when loading files
+};
+
+struct arc_metadata {
+	off_t arc_size;
+	uint32_t nr_files;
+	unsigned name_length;
+	uint32_t offset_key;
+	uint32_t size_key;
+	uint8_t name_key;
 };
 
 struct archive {
 	hashtable_t(arcindex) index;
 	vector_t(struct archive_data) files;
+	struct arc_metadata meta;
+	unsigned flags;
 	bool mapped;
 	union {
 		FILE *fp;
@@ -89,6 +101,12 @@ struct archive_data *archive_get_by_index(struct archive *arc, unsigned i)
 	attr_nonnull;
 
 /*
+ * Get the index of an entry by name.
+ */
+int archive_get_index(struct archive *arc, const char *name)
+	attr_nonnull;
+
+/*
  * Load data for an entry (if it is not already loaded). The caller owns a
  * reference to the entry when this function returns.
  *
@@ -107,5 +125,26 @@ bool archive_data_load(struct archive_data *data)
  * the file data.
  */
 #define archive_foreach(var, arc) vector_foreach_p(var, (arc)->files)
+
+enum arc_manifest_type {
+	ARC_MF_INVALID,
+	ARC_MF_ARCPACK,
+};
+
+struct arc_arcpack_manifest {
+	string input_arc;
+	vector_t(string) input_files;
+};
+
+struct arc_manifest {
+	enum arc_manifest_type type;
+	string output_path;
+	union {
+		struct arc_arcpack_manifest arcpack;
+	};
+};
+
+struct arc_manifest *arc_manifest_parse(const char *path);
+void arc_manifest_free(struct arc_manifest *mf);
 
 #endif

@@ -62,12 +62,8 @@ static bool extract_file(struct archive_data *data, const char *output_file, boo
 	return r;
 }
 
-static void extract_one(const char *arc_name, const char *name, const char *output_file, bool raw)
+static void extract_one(struct archive *arc, const char *name, const char *output_file, bool raw)
 {
-	struct archive *arc = archive_open(arc_name, 0);
-	if (!arc)
-		sys_error("Failed to open archive file \"%s\".\n", arc_name);
-
 	struct archive_data *data = archive_get(arc, name);
 	if (!data)
 		sys_error("Failed to read file \"%s\" from archive.\n", name);
@@ -75,7 +71,6 @@ static void extract_one(const char *arc_name, const char *name, const char *outp
 		sys_error("failed to write output file");
 
 	archive_data_release(data);
-	archive_close(arc);
 }
 
 // Add a trailing slash to a path
@@ -95,16 +90,12 @@ static char *output_dir_path(const char *path)
 	return s;
 }
 
-static void extract_all(const char *arc_name, const char *_output_dir, bool raw)
+static void extract_all(struct archive *arc, const char *_output_dir, bool raw)
 {
 	char *output_dir = output_dir_path(_output_dir);
 	if (mkdir_p(output_dir) < 0) {
 		sys_error("Failed to create output directory: %s.\n", strerror(errno));
 	}
-
-	struct archive *arc = archive_open(arc_name, 0);
-	if (!arc)
-		sys_error("Failed to open archive file \"%s\".\n", arc_name);
 
 	struct archive_data *data;
 	archive_foreach(data, arc) {
@@ -123,7 +114,6 @@ static void extract_all(const char *arc_name, const char *_output_dir, bool raw)
 		archive_data_release(data);
 	}
 
-	archive_close(arc);
 	free(output_dir);
 }
 
@@ -132,6 +122,7 @@ enum {
 	LOPT_GAME,
 	LOPT_NAME,
 	LOPT_RAW,
+	LOPT_KEY,
 };
 
 int arc_extract(int argc, char *argv[])
@@ -139,6 +130,7 @@ int arc_extract(int argc, char *argv[])
 	char *output_file = NULL;
 	char *name = NULL;
 	bool raw = false;
+	bool key = false;
 	while (1) {
 		int c = command_getopt(argc, argv, &cmd_arc_extract);
 		if (c == -1)
@@ -159,6 +151,9 @@ int arc_extract(int argc, char *argv[])
 		case LOPT_RAW:
 			raw = true;
 			break;
+		case LOPT_KEY:
+			key = true;
+			break;
 		}
 	}
 	argc -= optind;
@@ -167,11 +162,20 @@ int arc_extract(int argc, char *argv[])
 	if (argc != 1)
 		command_usage_error(&cmd_arc_extract, "Wrong number of arguments.\n");
 
-	if (name)
-		extract_one(argv[0], name, output_file, raw);
-	else
-		extract_all(argv[0], output_file, raw);
+	struct archive *arc = archive_open(argv[0], 0);
+	if (!arc)
+		sys_error("Failed to open archive file \"%s\".\n", argv[0]);
 
+	if (key) {
+		NOTICE("%08x%08x%02x%02x", arc->meta.offset_key, arc->meta.size_key,
+				arc->meta.name_key, arc->meta.name_length);
+	} else if (name) {
+		extract_one(arc, name, output_file, raw);
+	} else {
+		extract_all(arc, output_file, raw);
+	}
+
+	archive_close(arc);
 	return 0;
 }
 
@@ -186,6 +190,7 @@ struct command cmd_arc_extract = {
 		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
 		{ "name", 'n', "Specify the file to extract", required_argument, LOPT_NAME },
 		{ "raw", 0, "Do not convert (keep original file type)", no_argument, LOPT_RAW },
+		{ "key", 0, "Print the index encryption key (do not extract)", no_argument, LOPT_KEY },
 		{ 0 }
 	}
 };
