@@ -14,25 +14,43 @@
  * along with this program; if not, see <http://gnu.org/licenses/>.
  */
 
-#ifndef ELF_TOOLS_CLI_H
-#define ELF_TOOLS_CLI_H
+#ifndef ELF_TOOLS_CG_H
+#define ELF_TOOLS_CG_H
 
-#include "nulib/command.h"
+#include <stdint.h>
+#include <stdio.h>
 
-extern struct command cmd_elf;
-extern struct command cmd_arc;
-extern struct command cmd_arc_extract;
-extern struct command cmd_arc_list;
-extern struct command cmd_arc_pack;
-extern struct command cmd_cg;
-extern struct command cmd_cg_convert;
-extern struct command cmd_lzss;
-extern struct command cmd_lzss_compress;
-extern struct command cmd_lzss_decompress;
-extern struct command cmd_mes;
-extern struct command cmd_mes_compile;
-extern struct command cmd_mes_decompile;
+struct archive_data;
 
-void set_game(const char *name);
+enum cg_type {
+	CG_TYPE_G16,
+	CG_TYPE_G24,
+	CG_TYPE_G32,
+	CG_TYPE_PNG,
+	//CG_TYPE_BMP,
+};
 
-#endif // ELF_TOOLS_CLI_H
+struct cg_metrics {
+	unsigned x;
+	unsigned y;
+	unsigned w;
+	unsigned h;
+	unsigned bpp;
+	bool has_alpha;
+};
+
+struct cg {
+	struct cg_metrics metrics;
+	uint8_t *pixels;
+};
+
+enum cg_type cg_type_from_name(const char *name);
+
+struct cg *cg_load(uint8_t *data, size_t size, enum cg_type type);
+struct cg *cg_load_arcdata(struct archive_data *data);
+
+bool cg_write(struct cg *cg, FILE *out, enum cg_type type);
+
+void cg_free(struct cg *cg);
+
+#endif // ELF_TOOLS_CG_H

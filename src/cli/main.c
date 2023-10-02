@@ -40,6 +40,17 @@ struct command cmd_arc = {
 	}
 };
 
+struct command cmd_cg = {
+	.name = "cg",
+	.usage = "<command> ...",
+	.description = "Tools for converting images",
+	.parent = &cmd_elf,
+	.commands = {
+		&cmd_cg_convert,
+		NULL
+	}
+};
+
 struct command cmd_lzss = {
 	.name = "lzss",
 	.usage = "<command> ...",
@@ -71,6 +82,7 @@ struct command cmd_elf = {
 	.parent = NULL,
 	.commands = {
 		&cmd_arc,
+		&cmd_cg,
 		&cmd_lzss,
 		&cmd_mes,
 		NULL

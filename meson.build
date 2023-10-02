@@ -4,6 +4,8 @@ add_project_arguments('-D_DEFAULT_SOURCE', language : 'c')
 nulib_proj = subproject('nulib')
 nulib_dep = nulib_proj.get_variable('nulib_dep')
 
+png = dependency('libpng')
+
 flex = find_program('flex')
 bison = find_program('bison')
 
@@ -19,6 +21,9 @@ incdirs = include_directories('include')
 
 sources = [
   'src/core/arc/open.c',
+  'src/core/cg/cg.c',
+  'src/core/cg/g16_24_32.c',
+  'src/core/cg/png.c',
   'src/core/mes/decompile.c',
   'src/core/mes/flat_parser.c',
   'src/core/mes/pack.c',
@@ -28,6 +33,7 @@ sources = [
   'src/cli/arc_extract.c',
   'src/cli/arc_list.c',
   'src/cli/arc_pack.c',
+  'src/cli/cg_convert.c',
   'src/cli/lzss_compress.c',
   'src/cli/lzss_decompress.c',
   'src/cli/main.c',
@@ -42,7 +48,7 @@ sources += flexgen.process('src/core/arc/manifest_lexer.l')
 sources += bisongen.process('src/core/arc/manifest_parser.y')
 
 executable('elf', sources,
-  dependencies : nulib_dep,
+  dependencies : [nulib_dep, png],
   c_args : ['-Wno-unused-parameter'],
   include_directories : incdirs,
   install : true)
