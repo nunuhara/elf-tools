@@ -4,14 +4,6 @@ elf-tools
 This is a collection of command-line tools for viewing and editing file formats
 used in elf/Silky's games.
 
-Current Status
---------------
-
-I am currently building these tools for the purpose of reverse engineering the
-AI5WIN engine. As such, I am prioritizing the compiler/decompiler for that
-engine over other tools/features that might be more useful for translation,
-extracting assets, etc.
-
 Game Support
 ------------
 
@@ -58,7 +50,15 @@ The currently implemented commands are:
 
     elf arc extract   - Extract an archive file
     elf arc list      - List the contents of an archive file
+    elf arc pack      - Create/modify an archive file
+    elf cg  convert   - Convert an image file to another format
+    elf mes compile   - Compile a .mes file
     elf mes decompile - Decompile a .mes file
+
+### How-To
+
+[Text Replacement](README-text.md)  
+[Archive Extraction/Creation/Modification](README-arc.md)
 
 Source Code
 -----------

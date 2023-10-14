@@ -32,6 +32,8 @@ enum {
 	LOPT_FLAT,
 	LOPT_BLOCKS,
 	LOPT_TREE,
+	LOPT_TEXT,
+	LOPT_NAME,
 };
 
 enum decompile_mode {
@@ -39,12 +41,14 @@ enum decompile_mode {
 	DECOMPILE_FLAT,
 	DECOMPILE_BLOCKS,
 	DECOMPILE_TREE,
+	DECOMPILE_TEXT,
 };
 
 int cli_mes_decompile(int argc, char *argv[])
 {
 	char *output_file = NULL;
 	enum decompile_mode mode = DECOMPILE_NORMAL;
+	int name_function = -1;
 
 	while (1) {
 		int c = command_getopt(argc, argv, &cmd_mes_decompile);
@@ -68,6 +72,13 @@ int cli_mes_decompile(int argc, char *argv[])
 			break;
 		case LOPT_TREE:
 			mode = DECOMPILE_TREE;
+			break;
+		case 't':
+		case LOPT_TEXT:
+			mode = DECOMPILE_TEXT;
+			break;
+		case LOPT_NAME:
+			name_function = atoi(optarg);
 			break;
 		}
 	}
@@ -115,11 +126,17 @@ int cli_mes_decompile(int argc, char *argv[])
 			sys_error("Failed to decompile .mes file \"%s\".\n", argv[0]);
 		mes_block_tree_print(toplevel, &out);
 		mes_block_list_free(toplevel);
+	} else if (mode == DECOMPILE_TEXT) {
+		mes_statement_list statements = vector_initializer;
+		if (!(mes_parse_statements(mes, mes_size, &statements)))
+			sys_error("Failed to parse .mes file \"%s\".\n", argv[0]);
+		mes_text_print(statements, &out, name_function);
+		mes_statement_list_free(statements);
 	} else {
 		mes_ast_block toplevel = vector_initializer;
 		if (!(mes_decompile(mes, mes_size, &toplevel)))
 			sys_error("Failed to decompile .mes file \"%s\".\n", argv[0]);
-		mes_ast_block_print(toplevel, &out);
+		mes_ast_block_print(toplevel, -1, &out);
 		mes_ast_block_free(toplevel);
 	}
 
@@ -137,9 +154,11 @@ struct command cmd_mes_decompile = {
 	.options = {
 		{ "output", 'o', "Set the output file path", required_argument, LOPT_OUTPUT },
 		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
+		{ "text", 't', "Extract text only", no_argument, LOPT_TEXT },
 		{ "flat", 0, "Decompile to a flat list of statements", no_argument, LOPT_FLAT },
 		{ "blocks", 0, "Display (labelled) blocks", no_argument, LOPT_BLOCKS },
 		{ "tree", 0, "Display block tree", no_argument, LOPT_TREE },
+		{ "name-function", 0, "Specify the name function number", required_argument, LOPT_NAME },
 		{ 0 }
 	}
 };

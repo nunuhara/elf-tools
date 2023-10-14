@@ -353,6 +353,56 @@ struct mes_ast {
 	};
 };
 
+// ctor.c
+struct mes_statement *mes_stmt(enum mes_statement_op op);
+struct mes_statement *mes_stmt_end(void);
+struct mes_statement *mes_stmt_txt(string str);
+struct mes_statement *mes_stmt_str(string str);
+struct mes_statement *mes_stmt_setrbc(uint16_t no, mes_expression_list exprs);
+struct mes_statement *mes_stmt_setrbe(struct mes_expression *expr, mes_expression_list exprs);
+struct mes_statement *mes_stmt_setrbx(struct mes_expression *expr, mes_expression_list exprs);
+struct mes_statement *mes_stmt_setv(uint8_t no, mes_expression_list exprs);
+struct mes_statement *mes_stmt_setrd(uint8_t no, mes_expression_list exprs);
+struct mes_statement *mes_stmt_setac(uint8_t no, struct mes_expression *off,
+		mes_expression_list vals);
+struct mes_statement *mes_stmt_seta_at(uint8_t no, struct mes_expression *off,
+		mes_expression_list vals);
+struct mes_statement *mes_stmt_setad(uint8_t no, struct mes_expression *off,
+		mes_expression_list vals);
+struct mes_statement *mes_stmt_setaw(uint8_t no, struct mes_expression *off,
+		mes_expression_list vals);
+struct mes_statement *mes_stmt_setab(uint8_t no, struct mes_expression *off,
+		mes_expression_list vals);
+struct mes_statement *mes_stmt_sys_var16_set(struct mes_expression *no,
+		mes_expression_list vals);
+struct mes_statement *mes_stmt_sys_var32_set(struct mes_expression *no,
+		mes_expression_list vals);
+struct mes_statement *mes_stmt_jz(struct mes_expression *cond);
+struct mes_statement *mes_stmt_jmp(void);
+struct mes_statement *mes_stmt_sys(struct mes_expression *expr, mes_parameter_list params);
+struct mes_statement *mes_stmt_goto(mes_parameter_list params);
+struct mes_statement *mes_stmt_call(mes_parameter_list params);
+struct mes_statement *mes_stmt_proc(mes_parameter_list params);
+struct mes_statement *mes_stmt_menui(mes_parameter_list params);
+struct mes_statement *mes_stmt_util(mes_parameter_list params);
+struct mes_statement *mes_stmt_line(uint8_t arg);
+struct mes_statement *mes_stmt_procd(struct mes_expression *expr);
+struct mes_statement *mes_stmt_menus(void);
+struct mes_expression *mes_expr(enum mes_expression_op op);
+struct mes_expression *mes_expr_constant(long i);
+struct mes_expression *mes_expr_var4(struct mes_expression *index);
+struct mes_expression *mes_expr_var16(uint8_t no);
+struct mes_expression *mes_expr_var32(uint8_t no);
+struct mes_expression *mes_expr_system_var16(struct mes_expression *index);
+struct mes_expression *mes_expr_system_var32(struct mes_expression *index);
+struct mes_expression *mes_expr_array_index(enum mes_expression_op op, uint8_t var_no,
+		struct mes_expression *index);
+struct mes_expression *mes_expr_random(struct mes_expression *limit);
+struct mes_expression *mes_binary_expr(enum mes_expression_op op, struct mes_expression *a,
+		struct mes_expression *b);
+struct mes_parameter mes_param_str(string text);
+struct mes_parameter mes_param_expr(struct mes_expression *expr);
+
 struct port;
 
 bool mes_char_is_hankaku(uint8_t b);
@@ -379,8 +429,9 @@ void mes_statement_print(struct mes_statement *stmt, struct port *out);
 void mes_asm_statement_list_print(mes_statement_list statements, struct port *out);
 void mes_flat_statement_list_print(mes_statement_list statements, struct port *out);
 void mes_statement_list_print(mes_statement_list statements, struct port *out);
-void mes_ast_print(struct mes_ast *node, struct port *out);
-void mes_ast_block_print(mes_ast_block block, struct port *out);
+void mes_ast_print(struct mes_ast *node, int name_function, struct port *out);
+void mes_ast_block_print(mes_ast_block block, int name_function, struct port *out);
+void mes_text_print(mes_statement_list statements, struct port *out, int name_function);
 
 void mes_block_list_print(mes_block_list blocks, struct port *out);
 void mes_block_tree_print(mes_block_list blocks, struct port *out);
@@ -389,10 +440,29 @@ enum game_id;
 void mes_set_game(enum game_id id);
 uint8_t mes_stmt_opcode(enum mes_statement_op op);
 uint8_t mes_expr_opcode(enum mes_expression_op op);
+uint32_t mes_statement_size(struct mes_statement *stmt);
 
 mes_statement_list mes_flat_parse(const char *path);
 mes_parameter_list mes_resolve_syscall(mes_qname name, int *no);
 int mes_resolve_sysvar(string name, bool *dword);
 uint8_t *mes_pack(mes_statement_list stmts, size_t *size_out);
+
+void mes_statement_list_foreach_text(mes_statement_list statements,
+		int name_function,
+		void(*handle_text)(string text, struct mes_statement*, unsigned, void*),
+		void(*handle_statement)(struct mes_statement*, void*),
+		void *data);
+
+struct mes_text_substitution {
+	int no;
+	string from;
+	string to;
+};
+
+typedef vector_t(struct mes_text_substitution) mes_text_sub_list;
+
+bool mes_text_parse(FILE *f, mes_text_sub_list *out);
+void mes_text_sub_list_free(mes_text_sub_list list);
+mes_statement_list mes_substitute_text(mes_statement_list mes, mes_text_sub_list subs_in);
 
 #endif // ELF_TOOLS_MES_H

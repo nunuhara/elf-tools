@@ -1050,37 +1050,39 @@ void mes_block_tree_print(mes_block_list blocks, struct port *out)
 // blocks }}}
 // AST {{{
 
-static void mes_ast_node_print(struct mes_ast *node, struct port *out, int indent);
+static void mes_ast_node_print(struct mes_ast *node, int name_function, struct port *out,
+		int indent);
 
-static void _mes_ast_block_print(mes_ast_block block, struct port *out, int indent)
+static void _mes_ast_block_print(mes_ast_block block, int name_function, struct port *out,
+		int indent)
 {
 	struct mes_ast *node;
 	vector_foreach(node, block) {
-		mes_ast_node_print(node, out, indent);
+		mes_ast_node_print(node, name_function, out, indent);
 	}
 }
 
-void mes_ast_block_print(mes_ast_block block, struct port *out)
+void mes_ast_block_print(mes_ast_block block, int name_function, struct port *out)
 {
-	_mes_ast_block_print(block, out, 0);
+	_mes_ast_block_print(block, name_function, out, 0);
 }
 
-static void mes_ast_cond_print(struct mes_ast_if *cond, struct port *out, int indent)
+static void mes_ast_cond_print(struct mes_ast_if *cond, int name_function, struct port *out, int indent)
 {
 	port_puts(out, "if (");
 	mes_expression_print(cond->condition, out);
 	port_puts(out, ") {\n");
-	_mes_ast_block_print(cond->consequent, out, indent + 1);
+	_mes_ast_block_print(cond->consequent, name_function, out, indent + 1);
 	if (vector_length(cond->alternative) > 0) {
 		indent_print(out, indent);
 		struct mes_ast *alt = vector_A(cond->alternative, 0);
 		if (vector_length(cond->alternative) == 1 && alt->type == MES_AST_COND) {
 			port_puts(out, "} else ");
-			mes_ast_cond_print(&alt->cond, out, indent);
+			mes_ast_cond_print(&alt->cond, name_function, out, indent);
 			return;
 		}
 		port_puts(out, "} else {\n");
-		_mes_ast_block_print(cond->alternative, out, indent + 1);
+		_mes_ast_block_print(cond->alternative, name_function, out, indent + 1);
 	}
 	indent_print(out, indent);
 	port_puts(out, "}\n");
@@ -1092,44 +1094,83 @@ static bool stmt_is_normal_text(struct mes_statement *stmt)
 		&& stmt->TXT.terminated && !stmt->TXT.unprefixed;
 }
 
-static void mes_ast_statement_list_print(mes_statement_list statements, struct port *out,
-		int indent)
+void mes_statement_list_foreach_text(mes_statement_list statements,
+		int name_function,
+		void(*handle_text)(string text, struct mes_statement*, unsigned, void*),
+		void(*handle_statement)(struct mes_statement*, void*),
+		void *data)
 {
 	string text = NULL;
+	struct mes_statement *text_stmt = NULL;
+	unsigned text_nr_statements = 0;
 	for (unsigned i = 0; i < vector_length(statements); i++) {
 		struct mes_statement *stmt = vector_A(statements, i);
 		struct mes_statement *next = i + 1 < vector_length(statements) ?
-			vector_A(statements, i+1) : NULL;
+			vector_A(statements, i + 1) : NULL;
 		if (stmt_is_normal_text(stmt)) {
-			if (!text)
+			if (!text) {
 				text = string_dup(stmt->TXT.text);
-			else
+				text_stmt = stmt;
+				text_nr_statements = 1;
+			} else {
 				text = string_concat(text, stmt->TXT.text);
+				text_nr_statements++;
+			}
 			continue;
 		}
 		if (text && stmt->op == MES_STMT_PROC && next && stmt_is_normal_text(next)) {
 			int f = get_int_parameter(stmt->PROC.params, 0);
-			if (f >= 0) {
+			if (f >= 0 && f == name_function) {
 				text = string_concat_fmt(text, "$%i", f);
+				text_nr_statements++;
 				continue;
 			}
 		}
 		if (text) {
-			indent_print(out, indent);
-			port_printf(out, "\"%s\";\n", text);
+			handle_text(text, text_stmt, text_nr_statements, data);
 			string_free(text);
 			text = NULL;
 		}
-		_mes_statement_print(stmt, out, indent);
+		if (handle_statement)
+			handle_statement(stmt, data);
 	}
 	if (text) {
-		indent_print(out, indent);
-		port_printf(out, "\"%s\";\n", text);
+		handle_text(text, text_stmt, text_nr_statements, data);
 		string_free(text);
 	}
 }
 
-static void mes_ast_node_print(struct mes_ast *node, struct port *out, int indent)
+struct statement_list_print_data {
+	int indent;
+	struct port *out;
+};
+
+static void mes_ast_statement_list_print_text(string text, struct mes_statement *stmt,
+		unsigned nr_stmt, void *_data)
+{
+	struct statement_list_print_data *data = _data;
+	indent_print(data->out, data->indent);
+	port_printf(data->out, "\"%s\";\n", text);
+}
+
+static void mes_ast_statement_list_print_stmt(struct mes_statement *stmt, void *_data)
+{
+	struct statement_list_print_data *data = _data;
+	_mes_statement_print(stmt, data->out, data->indent);
+}
+
+static void mes_ast_statement_list_print(mes_statement_list statements, int name_function,
+		struct port *out, int indent)
+{
+	struct statement_list_print_data data = { .indent = indent, .out = out };
+	mes_statement_list_foreach_text(statements, -1,
+			mes_ast_statement_list_print_text,
+			mes_ast_statement_list_print_stmt,
+			&data);
+}
+
+static void mes_ast_node_print(struct mes_ast *node, int name_function, struct port *out,
+		int indent)
 {
 	if (node->is_goto_target) {
 		indent_print(out, indent - 1);
@@ -1137,18 +1178,18 @@ static void mes_ast_node_print(struct mes_ast *node, struct port *out, int inden
 	}
 	switch (node->type) {
 	case MES_AST_STATEMENTS:
-		mes_ast_statement_list_print(node->statements, out, indent);
+		mes_ast_statement_list_print(node->statements, name_function, out, indent);
 		break;
 	case MES_AST_COND:
 		indent_print(out, indent);
-		mes_ast_cond_print(&node->cond, out, indent);
+		mes_ast_cond_print(&node->cond, name_function, out, indent);
 		break;
 	case MES_AST_LOOP:
 		indent_print(out, indent);
 		port_puts(out, "while (");
 		mes_expression_print(node->loop.condition, out);
 		port_puts(out, ") {\n");
-		_mes_ast_block_print(node->loop.body, out, indent + 1);
+		_mes_ast_block_print(node->loop.body, name_function, out, indent + 1);
 		indent_print(out, indent);
 		port_puts(out, "}\n");
 		break;
@@ -1158,7 +1199,7 @@ static void mes_ast_node_print(struct mes_ast *node, struct port *out, int inden
 		port_puts(out, "procedure[");
 		mes_expression_print(node->proc.num_expr, out);
 		port_puts(out, "] = {\n");
-		_mes_ast_block_print(node->proc.body, out, indent + 1);
+		_mes_ast_block_print(node->proc.body, name_function, out, indent + 1);
 		indent_print(out, indent);
 		port_puts(out, "};\n");
 		break;
@@ -1167,7 +1208,7 @@ static void mes_ast_node_print(struct mes_ast *node, struct port *out, int inden
 		port_puts(out, "menu[");
 		mes_parameter_list_print(node->menu.params, out);
 		port_puts(out, "] = {\n");
-		_mes_ast_block_print(node->menu.body, out, indent + 1);
+		_mes_ast_block_print(node->menu.body, name_function, out, indent + 1);
 		indent_print(out, indent);
 		port_puts(out, "};\n");
 		break;
@@ -1182,9 +1223,36 @@ static void mes_ast_node_print(struct mes_ast *node, struct port *out, int inden
 	}
 }
 
-void mes_ast_print(struct mes_ast *node, struct port *out)
+void mes_ast_print(struct mes_ast *node, int name_function, struct port *out)
 {
-	mes_ast_node_print(node, out, 0);
+	mes_ast_node_print(node, name_function, out, 0);
 }
 
 // AST }}}
+// {{{ Text
+
+static void _mes_text_print(struct port *out, int i, string text)
+{
+	port_printf(out, "# %d \"%s\"\n\n", i, text);
+}
+
+struct text_print_data {
+	int count;
+	struct port *out;
+};
+
+static void text_print_handle_text(string text, struct mes_statement *stmt,
+		unsigned nr_stmt, void *_data)
+{
+	struct text_print_data *data = _data;
+	_mes_text_print(data->out, data->count++, text);
+}
+
+void mes_text_print(mes_statement_list statements, struct port *out, int name_function)
+{
+	struct text_print_data data = { .out = out };
+	mes_statement_list_foreach_text(statements, name_function, text_print_handle_text,
+			NULL, &data);
+}
+
+// }}} Text

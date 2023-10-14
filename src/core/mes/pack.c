@@ -95,10 +95,10 @@ static void _pack_expression(struct buffer *mes, struct mes_expression *expr)
 		return;
 	}
 
-	if (expr->sub_a)
-		_pack_expression(mes, expr->sub_a);
 	if (expr->sub_b)
 		_pack_expression(mes, expr->sub_b);
+	if (expr->sub_a)
+		_pack_expression(mes, expr->sub_a);
 
 	buffer_write_u8(mes, mes_expr_opcode(expr->op));
 	switch (expr->op) {

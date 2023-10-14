@@ -48,7 +48,7 @@ static bool extract_file(struct archive_data *data, const char *output_file, boo
 		if (!(mes_decompile(data->data, data->size, &toplevel))) {
 			sys_warning("Failed to decompile .mes file \"%s\".\n", data->name);
 		} else {
-			mes_ast_block_print(toplevel, &out);
+			mes_ast_block_print(toplevel, -1, &out);
 			mes_ast_block_free(toplevel);
 		}
 	} else {

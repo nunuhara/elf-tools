@@ -39,19 +39,17 @@ WS  [ \t\v\f]
 #include "nulib.h"
 #include "nulib/string.h"
 
-extern unsigned long mf_line;
-
 #define RETURN_STRING(tok_type) \
-    flat_lval.string = string_new_len(flat_text, flat_leng); return tok_type
+    mf_lval.string = string_new_len(mf_text, mf_leng); return tok_type
 
 #define RETURN_STRING_LITERAL \
-    flat_lval.string = string_new_len(flat_text+1, flat_leng-2); return STRING_LITERAL
+    mf_lval.string = string_new_len(mf_text+1, mf_leng-2); return STRING_LITERAL
 
 %}
 
 %option noyywrap
 %option yylineno
-%option prefix="flat_"
+%option prefix="mf_"
 
 %%
 

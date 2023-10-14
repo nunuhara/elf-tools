@@ -1,4 +1,4 @@
-%define api.prefix {flat_}
+%define api.prefix {mf_}
 %define parse.error detailed
 %define parse.lac full
 
@@ -46,7 +46,6 @@
 %%
 
 program
-	//: stmts { mf_program(mf_push_statement($1, mes_stmt_end())); }
 	: stmts { mf_program($1); }
 	;
 
@@ -54,8 +53,6 @@ stmts
 	: stmt { $$ = mf_push_statement((mes_statement_list)vector_initializer, $1); }
 	| stmts stmt { $$ = mf_push_statement($1, $2); }
 	// XXX: string literal can expand to multiple statements (mixed zenkaku/hankaku)
-	//| STRING_LITERAL ';' { $$ = mf_parse_string_literal($1); }
-	//| stmts STRING_LITERAL ';' { $$ = mf_append_statements($1, mf_parse_string_literal($2)); }
 	| str { $$ = $1; }
 	| stmts str { $$ = mf_append_statements($1, $2); }
 	;
@@ -89,13 +86,13 @@ stmt
 	| VAR32 '[' I_CONSTANT ']' ARROW DWORD '[' expr ']' '=' exprs ';'
 	  { $$ = mes_stmt_setad(mf_parse_u8($3) + 1, $8, $11); }
 	| JZ expr IDENTIFIER ';'
-	  { $$ = mes_stmt_jz($2, $3); }
+	  { $$ = mes_stmt_jz($2); mf_push_label_ref($$, $3); }
 	| GOTO IDENTIFIER ';'
-	  { $$ = mes_stmt_jmp($2); }
+	  { $$ = mes_stmt_jmp(); mf_push_label_ref($$, $2); }
 	| JUMP params ';'
 	  { $$ = mes_stmt_goto($2); }
 	| CALL params ';'
-	  { $$ = mes_stmt_call($2); }
+	  { $$ = mf_stmt_call($2); }
 	| UTIL params ';'
 	  { $$ = mes_stmt_util($2); }
 	| LINE I_CONSTANT ';'
@@ -103,17 +100,17 @@ stmt
 	| MENUEXEC ';'
 	  { $$ = mes_stmt_menus(); }
 	| SYSTEM '.' path params ';'
-	  { $$ = mes_stmt_named_sys($3, $4); }
+	  { $$ = mf_stmt_named_sys($3, $4); }
 	| SYSTEM '.' IDENTIFIER '=' exprs ';'
-	  { $$ = mes_stmt_sys_named_var_set($3, $5); }
+	  { $$ = mf_stmt_sys_named_var_set($3, $5); }
 	| SYSTEM '.' VAR16 '[' expr ']' '=' exprs ';'
 	  { $$ = mes_stmt_sys_var16_set($5, $8); }
 	| SYSTEM '.' VAR32 '[' expr ']' '=' exprs ';'
 	  { $$ = mes_stmt_sys_var32_set($5, $8); }
 	| DEFPROC expr IDENTIFIER ';'
-	  { $$ = mes_stmt_procd($2, $3); }
+	  { $$ = mes_stmt_procd($2); mf_push_label_ref($$, $3); }
 	| DEFMENU params IDENTIFIER ';'
-	  { $$ = mes_stmt_menui($2, $3); }
+	  { $$ = mes_stmt_menui($2); mf_push_label_ref($$, $3); }
 	;
 
 path
@@ -133,23 +130,23 @@ exprs
 	;
 
 primary_expr
-	: I_CONSTANT { $$ = mes_expr_constant($1); }
+	: I_CONSTANT { $$ = mf_parse_constant($1); }
 	| VAR4 '[' expr ']' { $$ = mes_expr_var4($3); }
-	| VAR16 '[' I_CONSTANT ']' { $$ = mes_expr_var16($3); }
-	| VAR32 '[' I_CONSTANT ']' { $$ = mes_expr_var32($3); }
+	| VAR16 '[' I_CONSTANT ']' { $$ = mes_expr_var16(mf_parse_u8($3)); }
+	| VAR32 '[' I_CONSTANT ']' { $$ = mes_expr_var32(mf_parse_u8($3)); }
 	| VAR16 '[' I_CONSTANT ']' ARROW BYTE '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY16_GET8, $3, $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY16_GET8, mf_parse_u8($3), $8); }
 	| VAR16 '[' I_CONSTANT ']' ARROW WORD '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY16_GET16, $3, $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY16_GET16, mf_parse_u8($3), $8); }
 	| VAR32 '[' I_CONSTANT ']' ARROW BYTE '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY32_GET8, $3, $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY32_GET8, mf_parse_u8($3), $8); }
 	| VAR32 '[' I_CONSTANT ']' ARROW WORD '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY32_GET16, $3, $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY32_GET16, mf_parse_u8($3), $8); }
 	| VAR32 '[' I_CONSTANT ']' ARROW DWORD '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY32_GET32, $3, $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY32_GET32, mf_parse_u8($3), $8); }
 	| SYSTEM '.' VAR16 '[' expr ']' { $$ = mes_expr_system_var16($5); }
 	| SYSTEM '.' VAR32 '[' expr ']' { $$ = mes_expr_system_var32($5); }
-	| SYSTEM '.' IDENTIFIER { $$ = mes_expr_named_sysvar($3); }
+	| SYSTEM '.' IDENTIFIER { $$ = mf_expr_named_sysvar($3); }
 	| RANDOM '(' expr ')' { $$ = mes_expr_random($3); }
 	| '(' expr ')' { $$ = $2; }
 	;
