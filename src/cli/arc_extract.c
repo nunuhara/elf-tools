@@ -25,41 +25,91 @@
 #include "nulib/port.h"
 #include "nulib/string.h"
 
+#include "cg.h"
 #include "cli.h"
 #include "arc.h"
 #include "mes.h"
 
-static bool extract_file(struct archive_data *data, const char *output_file, bool raw)
+static bool open_output_file(const char *path, struct port *out)
+{
+	if (!path) {
+		port_file_init(out, stdout);
+		return true;
+	}
+	if (!port_file_open(out, path)) {
+		WARNING("port_file_open: %s", strerror(errno));
+		return false;
+	}
+	return true;
+}
+
+static bool extract_raw(struct archive_data *data, const char *output_file)
 {
 	struct port out;
-	if (output_file) {
-		if (!port_file_open(&out, output_file)) {
-			WARNING("port_file_open: %s", strerror(errno));
-			return false;
-		}
-	} else {
-		port_file_init(&out, stdout);
+	if (!open_output_file(output_file, &out))
+		return false;
+	if (!port_write_bytes(&out, data->data, data->size)) {
+		WARNING("port_write_bytes: %s", strerror(errno));
+		port_close(&out);
+		return false;
 	}
-
-	bool r = true;
-	const char *ext = file_extension(data->name);
-	if (!raw && !strcasecmp(ext, "mes")) {
-		mes_ast_block toplevel = vector_initializer;
-		if (!(mes_decompile(data->data, data->size, &toplevel))) {
-			sys_warning("Failed to decompile .mes file \"%s\".\n", data->name);
-		} else {
-			mes_ast_block_print(toplevel, -1, &out);
-			mes_ast_block_free(toplevel);
-		}
-	} else {
-		if (!port_write_bytes(&out, data->data, data->size)) {
-			WARNING("port_write_bytes: %s", strerror(errno));
-			r = false;
-		}
-	}
-
 	port_close(&out);
-	return r;
+	return true;
+}
+
+static bool extract_mes(struct archive_data *data, const char *output_file)
+{
+	struct port out;
+	if (!open_output_file(output_file, &out))
+		return false;
+
+	mes_ast_block toplevel = vector_initializer;
+	if (!(mes_decompile(data->data, data->size, &toplevel))) {
+		sys_warning("Failed to decompile .mes file \"%s\".\n", data->name);
+		port_close(&out);
+		return false;
+	}
+	mes_ast_block_print(toplevel, -1, &out);
+	mes_ast_block_free(toplevel);
+	port_close(&out);
+	return true;
+}
+
+static bool extract_gxx(struct archive_data *data, const char *output_file)
+{
+	struct port out;
+	if (!open_output_file(output_file, &out))
+		return false;
+
+	struct cg *cg = cg_load_arcdata(data);
+	if (!cg) {
+		sys_warning("Failed to decode image file \"%s\".\n", data->name);
+		port_close(&out);
+		return false;
+	}
+	if (!cg_write(cg, out.file, CG_TYPE_PNG)) {
+		sys_warning("Failed to encode image file.\n");
+		cg_free(cg);
+		port_close(&out);
+		return false;
+	}
+
+	cg_free(cg);
+	port_close(&out);
+	return true;
+}
+
+static bool extract_file(struct archive_data *data, const char *output_file, bool raw)
+{
+	if (raw)
+		return extract_raw(data, output_file);
+
+	const char *ext = file_extension(data->name);
+	if (!strcasecmp(ext, "MES"))
+		return extract_mes(data, output_file);
+	if (!strcasecmp(ext, "G16") || !strcasecmp(ext, "G24") || !strcasecmp(ext, "G32"))
+		return extract_gxx(data, output_file);
+	return extract_raw(data, output_file);
 }
 
 static void extract_one(struct archive *arc, const char *name, const char *output_file, bool raw)
@@ -90,6 +140,28 @@ static char *output_dir_path(const char *path)
 	return s;
 }
 
+static string make_output_path(string dir, const char *name, const char *ext)
+{
+	string out_name = file_replace_extension(name, ext);
+	dir = string_concat(dir, out_name);
+	string_free(out_name);
+	return dir;
+}
+
+static string get_output_path(const char *dir, const char *name, bool raw)
+{
+	string path = string_new(dir);
+	if (raw)
+		return string_concat_cstring(path, name);
+
+	const char *ext = file_extension(name);
+	if (!strcasecmp(ext, "MES"))
+		return make_output_path(path, name, "SMES");
+	if (!strcasecmp(ext, "G16") || !strcasecmp(ext, "G24") || !strcasecmp(ext, "G32"))
+		return make_output_path(path, name, "PNG");
+	return string_concat_cstring(path, name);
+}
+
 static void extract_all(struct archive *arc, const char *_output_dir, bool raw)
 {
 	char *output_dir = output_dir_path(_output_dir);
@@ -100,17 +172,17 @@ static void extract_all(struct archive *arc, const char *_output_dir, bool raw)
 	struct archive_data *data;
 	archive_foreach(data, arc) {
 		if (!archive_data_load(data)) {
-			WARNING("Failed to read file \"%s\" from archive", data->name);
+			sys_warning("Failed to read file \"%s\" from archive\n", data->name);
 			continue;
 		}
-		char output_file[PATH_MAX];
-		snprintf(output_file, PATH_MAX, "%s%s", output_dir, data->name);
+		string output_file = get_output_path(output_dir, data->name, raw);
 		sys_message("%s... ", output_file);
 		if (extract_file(data, output_file, raw)) {
 			sys_message("OK\n");
 		} else {
-			WARNING("failed to extract file \"%s\"", data->name);
+			sys_warning("failed to extract file \"%s\"\n", data->name);
 		}
+		string_free(output_file);
 		archive_data_release(data);
 	}
 
@@ -127,8 +199,8 @@ enum {
 
 int arc_extract(int argc, char *argv[])
 {
-	char *output_file = NULL;
-	char *name = NULL;
+	const char *output_file = NULL;
+	const char *name = NULL;
 	bool raw = false;
 	bool key = false;
 	while (1) {

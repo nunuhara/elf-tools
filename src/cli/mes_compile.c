@@ -22,6 +22,7 @@
 #include "nulib.h"
 #include "nulib/file.h"
 #include "nulib/port.h"
+#include "nulib/string.h"
 
 #include "cli.h"
 #include "mes.h"
@@ -99,8 +100,8 @@ int cli_mes_compile(int argc, char *argv[])
 		mes = mes_flat_parse(argv[0]);
 	} else if (mode == MODE_TEXT) {
 		// read and parse input .MES file
-		char *mes_path = input_mes
-			? strdup(input_mes)
+		string mes_path = input_mes
+			? string_new(input_mes)
 			: file_replace_extension(argv[0], "MES.IN");
 		size_t data_size;
 		uint8_t *data = file_read(mes_path, &data_size);
@@ -108,7 +109,7 @@ int cli_mes_compile(int argc, char *argv[])
 			sys_error("Reading input .MES file \"%s\": %s", mes_path, strerror(errno));
 		if (!mes_parse_statements(data, data_size, &mes))
 			sys_error("Parsing input .MES file \"%s\"", mes_path);
-		free(mes_path);
+		string_free(mes_path);
 		free(data);
 
 		// read and parse input .TXT file

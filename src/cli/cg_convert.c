@@ -20,6 +20,7 @@
 
 #include "nulib.h"
 #include "nulib/file.h"
+#include "nulib/string.h"
 
 #include "cli.h"
 #include "cg.h"
@@ -30,7 +31,7 @@ enum {
 
 static int cli_cg_convert(int argc, char *argv[])
 {
-	char *output_file = NULL;
+	string output_file = NULL;
 
 	while (1) {
 		int c = command_getopt(argc, argv, &cmd_cg_convert);
@@ -40,7 +41,7 @@ static int cli_cg_convert(int argc, char *argv[])
 		switch (c) {
 		case 'o':
 		case LOPT_OUTPUT:
-			output_file = strdup(optarg);
+			output_file = string_new(optarg);
 			break;
 		}
 	}
@@ -86,7 +87,7 @@ static int cli_cg_convert(int argc, char *argv[])
 
 	cg_free(cg);
 	fclose(f);
-	free(output_file);
+	string_free(output_file);
 	return 0;
 }
 
