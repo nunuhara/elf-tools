@@ -110,33 +110,33 @@ int cli_mes_decompile(int argc, char *argv[])
 	// parse/decompile mes file
 	if (mode == DECOMPILE_FLAT) {
 		mes_statement_list statements = vector_initializer;
-		if (!(mes_parse_statements(mes, mes_size, &statements)))
+		if (!mes_parse_statements(mes, mes_size, &statements))
 			sys_error("Failed to parse .mes file \"%s\".\n", argv[0]);
 		mes_flat_statement_list_print(statements, &out);
 		mes_statement_list_free(statements);
 	} else if (mode == DECOMPILE_BLOCKS) {
 		mes_block_list toplevel = vector_initializer;
-		if (!(mes_decompile_debug(mes, mes_size, &toplevel)))
+		if (!mes_decompile_debug(mes, mes_size, &toplevel))
 			sys_error("Failed to decompile .mes file \"%s\".\n", argv[0]);
 		mes_block_list_print(toplevel, &out);
 		mes_block_list_free(toplevel);
 	} else if (mode == DECOMPILE_TREE) {
 		mes_block_list toplevel = vector_initializer;
-		if (!(mes_decompile_debug(mes, mes_size, &toplevel)))
+		if (!mes_decompile_debug(mes, mes_size, &toplevel))
 			sys_error("Failed to decompile .mes file \"%s\".\n", argv[0]);
 		mes_block_tree_print(toplevel, &out);
 		mes_block_list_free(toplevel);
 	} else if (mode == DECOMPILE_TEXT) {
 		mes_statement_list statements = vector_initializer;
-		if (!(mes_parse_statements(mes, mes_size, &statements)))
+		if (!mes_parse_statements(mes, mes_size, &statements))
 			sys_error("Failed to parse .mes file \"%s\".\n", argv[0]);
 		mes_text_print(statements, &out, name_function);
 		mes_statement_list_free(statements);
 	} else {
 		mes_ast_block toplevel = vector_initializer;
-		if (!(mes_decompile(mes, mes_size, &toplevel)))
+		if (!mes_decompile(mes, mes_size, &toplevel))
 			sys_error("Failed to decompile .mes file \"%s\".\n", argv[0]);
-		mes_ast_block_print(toplevel, -1, &out);
+		mes_ast_block_print(toplevel, name_function, &out);
 		mes_ast_block_free(toplevel);
 	}
 

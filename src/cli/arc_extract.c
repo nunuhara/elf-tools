@@ -30,6 +30,11 @@
 #include "arc.h"
 #include "mes.h"
 
+static bool raw = false;
+static bool mes_text = false;
+static bool mes_flat = false;
+static int mes_name_fun = -1;
+
 static bool open_output_file(const char *path, struct port *out)
 {
 	if (!path) {
@@ -63,13 +68,36 @@ static bool extract_mes(struct archive_data *data, const char *output_file)
 	if (!open_output_file(output_file, &out))
 		return false;
 
+	if (mes_flat || mes_text) {
+		mes_statement_list statements = vector_initializer;
+		if (!mes_parse_statements(data->data, data->size, &statements)) {
+			sys_warning("Failed to parse .mes file \"%s\".\n", data->name);
+			port_close(&out);
+			return false;
+		}
+		if (mes_flat) {
+			mes_flat_statement_list_print(statements, &out);
+		} else {
+			// write text file
+			mes_text_print(statements, &out, mes_name_fun);
+			// write mes file
+			string mes_file = file_replace_extension(output_file, "MES.IN");
+			if (!extract_raw(data, mes_file))
+				sys_warning("Failed to write .mes file \"%s\".\n", mes_file);
+			string_free(mes_file);
+		}
+		mes_statement_list_free(statements);
+		port_close(&out);
+		return true;
+	}
+
 	mes_ast_block toplevel = vector_initializer;
 	if (!(mes_decompile(data->data, data->size, &toplevel))) {
 		sys_warning("Failed to decompile .mes file \"%s\".\n", data->name);
 		port_close(&out);
 		return false;
 	}
-	mes_ast_block_print(toplevel, -1, &out);
+	mes_ast_block_print(toplevel, mes_name_fun, &out);
 	mes_ast_block_free(toplevel);
 	port_close(&out);
 	return true;
@@ -99,7 +127,7 @@ static bool extract_gxx(struct archive_data *data, const char *output_file)
 	return true;
 }
 
-static bool extract_file(struct archive_data *data, const char *output_file, bool raw)
+static bool extract_file(struct archive_data *data, const char *output_file)
 {
 	if (raw)
 		return extract_raw(data, output_file);
@@ -112,12 +140,12 @@ static bool extract_file(struct archive_data *data, const char *output_file, boo
 	return extract_raw(data, output_file);
 }
 
-static void extract_one(struct archive *arc, const char *name, const char *output_file, bool raw)
+static void extract_one(struct archive *arc, const char *name, const char *output_file)
 {
 	struct archive_data *data = archive_get(arc, name);
 	if (!data)
 		sys_error("Failed to read file \"%s\" from archive.\n", name);
-	if (!extract_file(data, output_file, raw))
+	if (!extract_file(data, output_file))
 		sys_error("failed to write output file");
 
 	archive_data_release(data);
@@ -148,21 +176,24 @@ static string make_output_path(string dir, const char *name, const char *ext)
 	return dir;
 }
 
-static string get_output_path(const char *dir, const char *name, bool raw)
+static string get_output_path(const char *dir, const char *name)
 {
 	string path = string_new(dir);
 	if (raw)
 		return string_concat_cstring(path, name);
 
 	const char *ext = file_extension(name);
-	if (!strcasecmp(ext, "MES"))
+	if (!strcasecmp(ext, "MES")) {
+		if (mes_text)
+			return make_output_path(path, name, "TXT");
 		return make_output_path(path, name, "SMES");
+	}
 	if (!strcasecmp(ext, "G16") || !strcasecmp(ext, "G24") || !strcasecmp(ext, "G32"))
 		return make_output_path(path, name, "PNG");
 	return string_concat_cstring(path, name);
 }
 
-static void extract_all(struct archive *arc, const char *_output_dir, bool raw)
+static void extract_all(struct archive *arc, const char *_output_dir)
 {
 	char *output_dir = output_dir_path(_output_dir);
 	if (mkdir_p(output_dir) < 0) {
@@ -175,9 +206,9 @@ static void extract_all(struct archive *arc, const char *_output_dir, bool raw)
 			sys_warning("Failed to read file \"%s\" from archive\n", data->name);
 			continue;
 		}
-		string output_file = get_output_path(output_dir, data->name, raw);
+		string output_file = get_output_path(output_dir, data->name);
 		sys_message("%s... ", output_file);
-		if (extract_file(data, output_file, raw)) {
+		if (extract_file(data, output_file)) {
 			sys_message("OK\n");
 		} else {
 			sys_warning("failed to extract file \"%s\"\n", data->name);
@@ -194,6 +225,9 @@ enum {
 	LOPT_GAME,
 	LOPT_NAME,
 	LOPT_RAW,
+	LOPT_MES_FLAT,
+	LOPT_MES_TEXT,
+	LOPT_MES_NAME,
 	LOPT_KEY,
 };
 
@@ -201,7 +235,6 @@ int arc_extract(int argc, char *argv[])
 {
 	const char *output_file = NULL;
 	const char *name = NULL;
-	bool raw = false;
 	bool key = false;
 	while (1) {
 		int c = command_getopt(argc, argv, &cmd_arc_extract);
@@ -223,6 +256,15 @@ int arc_extract(int argc, char *argv[])
 		case LOPT_RAW:
 			raw = true;
 			break;
+		case LOPT_MES_FLAT:
+			mes_flat = true;
+			break;
+		case LOPT_MES_TEXT:
+			mes_text = true;
+			break;
+		case LOPT_MES_NAME:
+			mes_name_fun = atoi(optarg);
+			break;
 		case LOPT_KEY:
 			key = true;
 			break;
@@ -242,9 +284,9 @@ int arc_extract(int argc, char *argv[])
 		NOTICE("%08x%08x%02x%02x", arc->meta.offset_key, arc->meta.size_key,
 				arc->meta.name_key, arc->meta.name_length);
 	} else if (name) {
-		extract_one(arc, name, output_file, raw);
+		extract_one(arc, name, output_file);
 	} else {
-		extract_all(arc, output_file, raw);
+		extract_all(arc, output_file);
 	}
 
 	archive_close(arc);
@@ -262,6 +304,9 @@ struct command cmd_arc_extract = {
 		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
 		{ "name", 'n', "Specify the file to extract", required_argument, LOPT_NAME },
 		{ "raw", 0, "Do not convert (keep original file type)", no_argument, LOPT_RAW },
+		{ "mes-flat", 0, "Output flat mes files", no_argument, LOPT_MES_FLAT },
+		{ "mes-text", 0, "Output text for mes files", no_argument, LOPT_MES_TEXT },
+		{ "mes-name-function", 0, "Specify the name function number for mes files", no_argument, LOPT_MES_NAME },
 		{ "key", 0, "Print the index encryption key (do not extract)", no_argument, LOPT_KEY },
 		{ 0 }
 	}
