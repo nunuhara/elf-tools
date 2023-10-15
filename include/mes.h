@@ -453,10 +453,16 @@ void mes_statement_list_foreach_text(mes_statement_list statements,
 		void(*handle_statement)(struct mes_statement*, void*),
 		void *data);
 
+struct mes_text_line {
+	char *text;
+	unsigned columns;
+};
+
 struct mes_text_substitution {
 	int no;
+	int columns;
 	string from;
-	string to;
+	vector_t(struct mes_text_line) to;
 };
 
 typedef vector_t(struct mes_text_substitution) mes_text_sub_list;

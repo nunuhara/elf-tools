@@ -31,25 +31,15 @@ For example,
     # 1 "2行目"
     Second line.
 
-If the replacement text spans multiple lines, the lines are joined *without*
-a newline in between. For example, the replacement text for:
+You can configure the allowed number of columns using the `columns` directive.
+This way, a warning will be printed if a line exceeds the configured number of
+columns. Using the `columns` directive also allows for one additional column
+to be used per line.
 
-    # 0 "1行目"
-    First line
-    continuation.
+For example, the size of the dialog box in Isaku (Renewal version) is 59
+columns. So you would add this line to the top of each file:
 
-will become `First linecontinuation`. If you want your text to span multiple
-lines, you need to add the correct amount of padding at the end of each line.
-This can be automated by using the `columns` directive. For example,
-
-    # columns = 14
-
-    # 0 "1行目"
-    First line
-    continuation.
-
-In this case, the replacement text would be `First line    continuation.`
-The amount of padding required will depend on the game.
+    # columns = 59
 
 ### Substituting Replacement Text
 

@@ -218,8 +218,12 @@ void mes_text_sub_list_free(mes_text_sub_list list)
 {
 	struct mes_text_substitution *sub;
 	vector_foreach_p(sub, list) {
+		struct mes_text_line s;
+		vector_foreach(s, sub->to) {
+			free(s.text);
+		}
+		vector_destroy(sub->to);
 		string_free(sub->from);
-		string_free(sub->to);
 	}
 	vector_destroy(list);
 }
@@ -280,28 +284,17 @@ bool mes_text_parse(FILE *f, mes_text_sub_list *out)
 			if (sub.no >= 0)
 				break;
 		}
+		sub.columns = state.columns;
 
 		// read lines until first blank line
-		sub.to = string_empty();
 		while (state.line < vector_length(lines)) {
 			char *str = vector_A(lines, state.line);
 			unsigned cols = strcols(&state, str);
 			state.line++;
 			if (*str == '\0')
 				break;
-			// handle padding (if configured)
-			int pad = state.columns - cols;
-			sub.to = string_concat_cstring(sub.to, str);
-			// skip padding on final line of substitution
-			if (state.line >= vector_length(lines) || *vector_A(lines, state.line) == '\0')
-				continue;
-			if (pad > 0) {
-				size_t off = string_length(sub.to);
-				sub.to = string_grow(sub.to, off + pad);
-				memset(sub.to + off, ' ', pad);
-			} else if (pad < 0 && state.columns > 0) {
-				PARSE_WARNING(&state, "Length of line exceeds configured columns value.");
-			}
+			struct mes_text_line l = { strdup(str), cols };
+			vector_push(struct mes_text_line, sub.to, l);
 		}
 
 		vector_push(struct mes_text_substitution, subs, sub);
@@ -387,12 +380,39 @@ static void push_call(unsigned fno, mes_statement_list *mes, uint32_t *mes_addr)
 }
 
 // split text into hankaku/zenkaku parts and push statements to list
-void encode_substitution(const string text, mes_statement_list *mes, uint32_t *mes_addr)
+void encode_substitution(struct mes_text_substitution *sub, mes_statement_list *mes,
+		uint32_t *mes_addr)
 {
-	const char *p = text;
-	const char *start = text;
+	if (vector_length(sub->to) == 0) {
+		const char *tmp;
+		sys_warning("WARNING: no substitution for string %d\n", sub->no);
+		push_string(sub->from, string_length(sub->from),
+				utf8_sjis_char_length(sub->from, &tmp) == 2,
+				mes, mes_addr);
+		return;
+	}
+
+	int line_no = 0;
+	struct mes_text_line line = vector_A(sub->to, 0);
+	const char *p = line.text;
+	const char *start = p;
 	bool zenkaku = false;
-	while (*p) {
+	while (true) {
+		// end of line
+		if (*p == '\0') {
+			if (p > start)
+				push_string(start, p - start, zenkaku, mes, mes_addr);
+			if (++line_no >= vector_length(sub->to))
+				break;
+			if (line.columns < sub->columns)
+				push_stmt(mes_stmt_line(0), mes, mes_addr);
+			if (sub->columns && line.columns > sub->columns)
+				sys_warning("WARNING: Line # %d exceeds configured columns value\n",
+						sub->no);
+			line = vector_A(sub->to, line_no);
+			p = line.text;
+			start = p;
+		}
 		// embedded procedure call (name function)
 		if (p[0] == '$' && p[1] == '(') {
 			char *endptr;
@@ -435,9 +455,6 @@ void encode_substitution(const string text, mes_statement_list *mes, uint32_t *m
 		}
 		zenkaku = next_zenkaku;
 		p = next;
-	}
-	if (p > start) {
-		push_string(start, p - start, zenkaku, mes, mes_addr);
 	}
 }
 
@@ -488,7 +505,7 @@ mes_statement_list mes_substitute_text(mes_statement_list mes, mes_text_sub_list
 		}
 		// encode substitution text as statement(s) and push to new list
 		size_t n = vector_length(mes_out);
-		encode_substitution(sub->to, &mes_out, &mes_addr);
+		encode_substitution(sub, &mes_out, &mes_addr);
 		if (loc->stmt->is_jump_target) {
 			addr_table_add(&table, vector_A(mes, mes_pos)->address, vector_A(mes_out, n));
 		}
