@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include "nulib.h"
 #include "nulib/buffer.h"
@@ -37,7 +38,7 @@ enum arc_file_type {
 struct arc_file {
 	enum arc_file_type type;
 	union {
-		struct { string path; } fs;
+		struct { string name; string path; } fs;
 		struct { string name; uint8_t *data; size_t size; } mem;
 		struct archive_data *arcdata;
 	};
@@ -177,7 +178,7 @@ bool arc_write(const char *path, arc_file_list files, struct arc_metadata *meta)
  * Prepare an arc_file struct for a given filesystem path
  * (not necessarily an ARC_FILE_FS, if conversion is involved).
  */
-static struct arc_file arc_file_fs(string path)
+static struct arc_file arc_file_fs(string path, string name)
 {
 	// handle conversions
 	const char *ext = file_extension(path);
@@ -196,7 +197,7 @@ static struct arc_file arc_file_fs(string path)
 		return (struct arc_file) {
 			.type = ARC_FILE_MEM,
 			.mem = {
-				.name = string_dup(path),
+				.name = name,
 				.data = data,
 				.size = size,
 			}
@@ -206,8 +207,22 @@ static struct arc_file arc_file_fs(string path)
 	// plain file to be read from filesystem (without compression, etc.)
 	return (struct arc_file) {
 		.type = ARC_FILE_FS,
-		.fs.path = string_dup(path)
+		.fs = {
+			.name = name,
+			.path = string_dup(path),
+		}
 	};
+}
+
+/*
+ * Return the upper-cased basename of the path.
+ */
+static string path_to_arc_name(string path)
+{
+	char *p = strrchr(path, '/');
+	if (!p)
+		return string_dup(path);
+	return string_new(p+1);
 }
 
 /*
@@ -235,17 +250,18 @@ static arc_file_list arcpack_file_list(struct arc_arcpack_manifest *mf,
 	}
 
 	// add files from manifest
-	string name;
-	vector_foreach(name, mf->input_files) {
+	string path;
+	vector_foreach(path, mf->input_files) {
 		int i;
+		string name = path_to_arc_name(path);
 		if (arc && (i = archive_get_index(arc, name)) >= 0) {
 			// if name appears in input archive, replace the entry
 			struct arc_file *f = &vector_A(files, i);
 			arc_file_free(f);
-			*f = arc_file_fs(name);
+			*f = arc_file_fs(path, name);
 		} else {
 			// otherwise add a new entry
-			vector_push(struct arc_file, files, arc_file_fs(name));
+			vector_push(struct arc_file, files, arc_file_fs(path, name));
 		}
 	}
 
