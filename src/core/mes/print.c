@@ -1112,6 +1112,12 @@ void mes_statement_list_foreach_text(mes_statement_list statements,
 				text = string_dup(stmt->TXT.text);
 				text_stmt = stmt;
 				text_nr_statements = 1;
+			} else if (stmt->is_jump_target) {
+				handle_text(text, text_stmt, text_nr_statements, data);
+				string_free(text);
+				text = string_dup(stmt->TXT.text);
+				text_stmt = stmt;
+				text_nr_statements = 1;
 			} else {
 				text = string_concat(text, stmt->TXT.text);
 				text_nr_statements++;
