@@ -229,7 +229,7 @@ static string path_to_arc_name(string path)
  * Prepare an arc_file_list for an ARCPACK manifest.
  */
 static arc_file_list arcpack_file_list(struct arc_arcpack_manifest *mf,
-		struct archive **arc_out)
+		struct archive **arc_out, struct arc_metadata *meta)
 {
 	struct archive *arc = NULL;
 	arc_file_list files = vector_initializer;
@@ -254,6 +254,8 @@ static arc_file_list arcpack_file_list(struct arc_arcpack_manifest *mf,
 	vector_foreach(path, mf->input_files) {
 		int i;
 		string name = path_to_arc_name(path);
+		if (string_length(name) >= meta->name_length)
+			sys_error("File name too long: \"%s\"\n", name);
 		if (arc && (i = archive_get_index(arc, name)) >= 0) {
 			// if name appears in input archive, replace the entry
 			struct arc_file *f = &vector_A(files, i);
@@ -372,7 +374,7 @@ break;
 		sys_error("Unsupported manifest type.\n");
 
 	struct archive *arc = NULL;
-	arc_file_list files = arcpack_file_list(&mf->arcpack, &arc);
+	arc_file_list files = arcpack_file_list(&mf->arcpack, &arc, &meta);
 	arc_write(mf->output_path, files, &meta);
 
 	if (arc)
