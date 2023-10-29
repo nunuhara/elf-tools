@@ -175,6 +175,10 @@ static bool parse_head(struct mes_text_sub_state *state, char *head,
 	if (!expect_char(state, &head, '#'))
 		return false;
 
+	// '## ...' is a comment
+	if (*head == '#')
+		return true;
+
 	skip_whitespace(&head);
 
 	// config headers
@@ -289,6 +293,11 @@ bool mes_text_parse(FILE *f, mes_text_sub_list *out)
 		// read lines until first blank line
 		while (state.line < vector_length(lines)) {
 			char *str = vector_A(lines, state.line);
+			// '## ...' is a comment
+			if (str[0] == '#' && str[1] == '#') {
+				state.line++;
+				continue;
+			}
 			unsigned cols = strcols(&state, str);
 			state.line++;
 			if (*str == '\0')
@@ -380,16 +389,17 @@ static void push_call(unsigned fno, mes_statement_list *mes, uint32_t *mes_addr)
 }
 
 // split text into hankaku/zenkaku parts and push statements to list
-void encode_substitution(struct mes_text_substitution *sub, mes_statement_list *mes,
+bool encode_substitution(struct mes_text_substitution *sub, mes_statement_list *mes,
 		uint32_t *mes_addr)
 {
 	if (vector_length(sub->to) == 0) {
 		const char *tmp;
-		sys_warning("WARNING: no substitution for string %d\n", sub->no);
+		// TODO: print this only in verbose mode
+		//sys_warning("WARNING: no substitution for string %d\n", sub->no);
 		push_string(sub->from, string_length(sub->from),
 				utf8_sjis_char_length(sub->from, &tmp) == 2,
 				mes, mes_addr);
-		return;
+		return false;
 	}
 
 	int line_no = 0;
@@ -456,6 +466,7 @@ void encode_substitution(struct mes_text_substitution *sub, mes_statement_list *
 		zenkaku = next_zenkaku;
 		p = next;
 	}
+	return true;
 }
 
 static void copy_stmt(mes_statement_list mes, unsigned mes_pos, uint32_t *mes_addr,
@@ -494,6 +505,7 @@ mes_statement_list mes_substitute_text(mes_statement_list mes, mes_text_sub_list
 	unsigned mes_pos = 0;
 	uint32_t mes_addr = 0;
 	mes_statement_list mes_out = vector_initializer;
+	unsigned missing_subs = 0;
 	for (int i = 0; i < vector_length(subs); i++) {
 		struct mes_text_substitution *sub = &vector_A(subs, i);
 		struct text_pos *loc = &vector_A(text_locs, i);
@@ -505,7 +517,8 @@ mes_statement_list mes_substitute_text(mes_statement_list mes, mes_text_sub_list
 		}
 		// encode substitution text as statement(s) and push to new list
 		size_t n = vector_length(mes_out);
-		encode_substitution(sub, &mes_out, &mes_addr);
+		if (!encode_substitution(sub, &mes_out, &mes_addr))
+			missing_subs++;
 		if (loc->stmt->is_jump_target) {
 			addr_table_add(&table, vector_A(mes, mes_pos)->address, vector_A(mes_out, n));
 		}
@@ -544,5 +557,7 @@ mes_statement_list mes_substitute_text(mes_statement_list mes, mes_text_sub_list
 	vector_destroy(subs);
 	vector_destroy(mes);
 	hashtable_destroy(addr_table, &table);
+	if (missing_subs)
+		sys_warning("WARNING: %u lines without substitutions.\n", missing_subs);
 	return mes_out;
 }
