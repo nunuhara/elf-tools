@@ -80,9 +80,9 @@ stmt
 	| VAR16 '[' I_CONSTANT ']' ARROW WORD '[' expr ']' '=' exprs ';'
 	  { $$ = mes_stmt_seta_at(mf_parse_u8($3) + 1, $8, $11); }
 	| VAR32 '[' I_CONSTANT ']' ARROW BYTE '[' expr ']' '=' exprs ';'
-	  { $$ = mes_stmt_setab(mf_parse_u8($3), $8, $11); }
+	  { $$ = mes_stmt_setab(mf_parse_u8($3) + 1, $8, $11); }
 	| VAR32 '[' I_CONSTANT ']' ARROW WORD '[' expr ']' '=' exprs ';'
-	  { $$ = mes_stmt_setaw(mf_parse_u8($3), $8, $11); }
+	  { $$ = mes_stmt_setaw(mf_parse_u8($3) + 1, $8, $11); }
 	| VAR32 '[' I_CONSTANT ']' ARROW DWORD '[' expr ']' '=' exprs ';'
 	  { $$ = mes_stmt_setad(mf_parse_u8($3) + 1, $8, $11); }
 	| JZ expr IDENTIFIER ';'

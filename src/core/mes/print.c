@@ -803,7 +803,7 @@ static void _mes_statement_print(struct mes_statement *stmt, struct port *out, i
 		break;
 	case MES_STMT_SETAW:
 		// var32[v]->word[e] = ...;
-		port_printf(out, "var32[%d]->word[", (int)stmt->SETAW.var_no);
+		port_printf(out, "var32[%d]->word[", (int)stmt->SETAW.var_no - 1);
 		mes_expression_print(stmt->SETAW.off_expr, out);
 		port_puts(out, "] = ");
 		mes_expression_list_print(stmt->SETAW.val_exprs, out);
@@ -811,7 +811,7 @@ static void _mes_statement_print(struct mes_statement *stmt, struct port *out, i
 		break;
 	case MES_STMT_SETAB:
 		// var32[v]->byte[e] = ...;
-		port_printf(out, "var32[%d]->byte[", (int)stmt->SETAB.var_no);
+		port_printf(out, "var32[%d]->byte[", (int)stmt->SETAB.var_no - 1);
 		mes_expression_print(stmt->SETAB.off_expr, out);
 		port_puts(out, "] = ");
 		mes_expression_list_print(stmt->SETAB.val_exprs, out);
