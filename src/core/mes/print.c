@@ -138,23 +138,38 @@ case MES_EXPR_END:
 	return true;
 }
 
+static bool is_bitwise(enum mes_expression_op op)
+{
+	switch (op) {
+	case MES_EXPR_BITAND:
+	case MES_EXPR_BITIOR:
+	case MES_EXPR_BITXOR:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static void _mes_expression_print(struct mes_expression *expr, struct port *out, bool bitwise);
+
 static void mes_binary_expression_print(enum mes_expression_op op, struct mes_expression *lhs,
 		struct mes_expression *rhs, struct port *out)
 {
+	bool bitwise = is_bitwise(op);
 	if (binary_parens_required(op, rhs)) {
 		port_putc(out, '(');
-		mes_expression_print(rhs, out);
+		_mes_expression_print(rhs, out, bitwise);
 		port_putc(out, ')');
 	} else {
-		mes_expression_print(rhs, out);
+		_mes_expression_print(rhs, out, bitwise);
 	}
 	port_printf(out, " %s ", binary_op_to_string(op));
 	if (binary_parens_required(op, lhs)) {
 		port_putc(out, '(');
-		mes_expression_print(lhs, out);
+		_mes_expression_print(lhs, out, bitwise);
 		port_putc(out, ')');
 	} else {
-		mes_expression_print(lhs, out);
+		_mes_expression_print(lhs, out, bitwise);
 	}
 }
 
@@ -221,22 +236,28 @@ static void op_array32_get32_print(struct mes_expression *expr, struct port *out
 	port_putc(out, ']');
 }
 
-static void print_number(uint32_t n, struct port *out)
+static void print_number(uint32_t n, struct port *out, bool hex)
 {
 	if (n < 255) {
-		port_printf(out, "%u", n);
+		/* nothing */
+	} else if ((n & 0xff) == 0) {
+		hex = true;
 	} else if ((n & (n - 1)) == 0 || ((n+1) & n) == 0) {
+		hex = true;
+	}
+
+	if (hex) {
 		port_printf(out, "0x%x", n);
 	} else {
 		port_printf(out, "%u", n);
 	}
 }
 
-void mes_expression_print(struct mes_expression *expr, struct port *out)
+static void _mes_expression_print(struct mes_expression *expr, struct port *out, bool bitwise)
 {
 	switch (expr->op) {
 	case MES_EXPR_IMM:
-		print_number(expr->arg8, out);
+		print_number(expr->arg8, out, bitwise);
 		break;
 	case MES_EXPR_VAR:
 		port_printf(out, "var16[%u]", (unsigned)expr->arg8);
@@ -303,10 +324,10 @@ void mes_expression_print(struct mes_expression *expr, struct port *out)
 		mes_binary_expression_print(MES_EXPR_NEQ, expr->sub_a, expr->sub_b, out);
 		break;
 	case MES_EXPR_IMM16:
-		print_number(expr->arg16, out);
+		print_number(expr->arg16, out, bitwise);
 		break;
 	case MES_EXPR_IMM32:
-		print_number(expr->arg32, out);
+		print_number(expr->arg32, out, bitwise);
 		break;
 	case MES_EXPR_REG16:
 		port_printf(out, "var4[%u]", (unsigned)expr->arg16);
@@ -335,6 +356,11 @@ void mes_expression_print(struct mes_expression *expr, struct port *out)
 	case MES_EXPR_END:
 		ERROR("encountered END expression when printing");
 	}
+}
+
+void mes_expression_print(struct mes_expression *expr, struct port *out)
+{
+	_mes_expression_print(expr, out, false);
 }
 
 void mes_expression_list_print(mes_expression_list list, struct port *out)
