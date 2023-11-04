@@ -602,6 +602,10 @@ static void stmt_sys_print(struct mes_statement *stmt, struct port *out)
 			port_puts(out, "System.Cursor.set_pos");
 		else if (cmd == 4)
 			port_puts(out, "System.Cursor.open");
+		else if (cmd == 5)
+			port_puts(out, "System.Cursor.show");
+		else if (cmd == 6)
+			port_puts(out, "System.Cursor.hide");
 		else
 			port_printf(out, "System.Cursor.function[%d]", cmd);
 		mes_parameter_list_print_from(stmt->SYS.params, 1, out);
@@ -680,13 +684,21 @@ static void stmt_sys_print(struct mes_statement *stmt, struct port *out)
 	case 9:
 		if ((cmd = get_int_parameter(stmt->SYS.params, 0)) < 0)
 			goto fallback;
-		port_printf(out, "System.Palette.function[%d]", cmd);
+		if (cmd == 0)
+			port_puts(out, "System.Palette.set");
+		else
+			port_printf(out, "System.Palette.function[%d]", cmd);
 		mes_parameter_list_print_from(stmt->SYS.params, 1, out);
 		break;
 	case 10:
 		if ((cmd = get_int_parameter(stmt->SYS.params, 0)) < 0)
 			goto fallback;
-		port_printf(out, "System.Image.function[%d]", cmd);
+		if (cmd == 2)
+			port_puts(out, "System.Image.fill");
+		else if (cmd == 4)
+			port_puts(out, "System.Image.clear_text");
+		else
+			port_printf(out, "System.Image.function[%d]", cmd);
 		mes_parameter_list_print_from(stmt->SYS.params, 1, out);
 		break;
 	case 12:

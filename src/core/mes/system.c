@@ -36,6 +36,8 @@ static struct mes_path_component sys_cursor_refresh = { .name = "refresh" };
 static struct mes_path_component sys_cursor_save_pos = { .name = "save_pos" };
 static struct mes_path_component sys_cursor_set_pos = { .name = "set_pos" };
 static struct mes_path_component sys_cursor_open = { .name = "open" };
+static struct mes_path_component sys_cursor_show = { .name = "show" };
+static struct mes_path_component sys_cursor_hide = { .name = "hide" };
 
 static struct mes_path_component *sys_cursor_children[] = {
 	[0] = &sys_cursor_load,
@@ -43,6 +45,8 @@ static struct mes_path_component *sys_cursor_children[] = {
 	[2] = &sys_cursor_save_pos,
 	[3] = &sys_cursor_set_pos,
 	[4] = &sys_cursor_open,
+	[5] = &sys_cursor_show,
+	[6] = &sys_cursor_hide,
 };
 
 static struct mes_path_component sys_cursor = {
@@ -102,12 +106,30 @@ static struct mes_path_component sys_file = {
 
 static struct mes_path_component sys_load_image = { .name = "load_image" };
 
+static struct mes_path_component sys_palette_set = { .name = "set" };
+
+static struct mes_path_component *sys_palette_children[] = {
+	[0] = &sys_palette_set,
+};
+
 static struct mes_path_component sys_palette = {
-	.name = "Palette"
+	.name = "Palette",
+	.nr_children = ARRAY_SIZE(sys_palette_children),
+	.children = sys_palette_children
+};
+
+static struct mes_path_component sys_image_fill = { .name = "fill" };
+static struct mes_path_component sys_image_clear_text = { "clear_text" };
+
+static struct mes_path_component *sys_image_children[] = {
+	[2] = &sys_image_fill,
+	[4] = &sys_image_clear_text,
 };
 
 static struct mes_path_component sys_image = {
-	.name = "Image"
+	.name = "Image",
+	.nr_children = ARRAY_SIZE(sys_image_children),
+	.children = sys_image_children
 };
 
 static struct mes_path_component sys_set_text_colors = { .name = "set_text_colors" };
