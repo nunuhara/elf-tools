@@ -24,10 +24,10 @@
 #include "nulib/file.h"
 #include "nulib/port.h"
 #include "nulib/string.h"
+#include "ai5/arc.h"
+#include "ai5/cg.h"
 
-#include "cg.h"
 #include "cli.h"
-#include "arc.h"
 #include "mes.h"
 
 static bool raw = false;

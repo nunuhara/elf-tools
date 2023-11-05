@@ -1,8 +1,8 @@
 project('elf-tools', 'c', default_options : ['c_std=c11'])
 add_project_arguments('-D_DEFAULT_SOURCE', language : 'c')
 
-nulib_proj = subproject('nulib')
-nulib_dep = nulib_proj.get_variable('nulib_dep')
+libai5_proj = subproject('libai5')
+libai5_dep = libai5_proj.get_variable('libai5_dep')
 
 png = dependency('libpng')
 
@@ -20,18 +20,12 @@ bisongen = generator(bison,
 incdirs = include_directories('include')
 
 sources = [
-  'src/core/arc/open.c',
-  'src/core/cg/cg.c',
-  'src/core/cg/g16_24_32.c',
-  'src/core/cg/png.c',
   'src/core/mes/ctor.c',
   'src/core/mes/decompile.c',
   'src/core/mes/flat_parser.c',
   'src/core/mes/pack.c',
-  'src/core/mes/parse.c',
   'src/core/mes/print.c',
   'src/core/mes/size.c',
-  'src/core/mes/system.c',
   'src/core/mes/text_parser.c',
   'src/cli/arc_extract.c',
   'src/cli/arc_list.c',
@@ -51,7 +45,7 @@ sources += flexgen.process('src/core/arc/manifest_lexer.l')
 sources += bisongen.process('src/core/arc/manifest_parser.y')
 
 executable('elf', sources,
-  dependencies : [nulib_dep, png],
+  dependencies : [libai5_dep, png],
   c_args : ['-Wno-unused-parameter'],
   include_directories : incdirs,
   install : true)

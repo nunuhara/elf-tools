@@ -24,10 +24,11 @@
 #include "nulib/string.h"
 #include "nulib/vector.h"
 #include "nulib/utfsjis.h"
+#include "ai5/game.h"
+
 #include "mes.h"
 
 #include "flat_parser.h"
-#include "game.h"
 
 extern int mf_lineno;
 

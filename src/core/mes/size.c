@@ -19,9 +19,8 @@
 #include "nulib.h"
 #include "nulib/string.h"
 #include "nulib/utfsjis.h"
-
+#include "ai5/game.h"
 #include "mes.h"
-#include "game.h"
 
 static uint32_t _expression_size(struct mes_expression *expr)
 {

@@ -15,9 +15,9 @@
  */
 
 #include "nulib.h"
+#include "ai5/arc.h"
 
 #include "cli.h"
-#include "arc.h"
 
 int arc_list(int argc, char *argv[])
 {

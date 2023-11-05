@@ -21,8 +21,8 @@
 #include "nulib/buffer.h"
 #include "nulib/string.h"
 #include "nulib/utfsjis.h"
+#include "ai5/game.h"
 
-#include "game.h"
 #include "mes.h"
 
 void pack_string(struct buffer *mes, const string text, bool terminated)

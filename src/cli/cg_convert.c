@@ -21,9 +21,9 @@
 #include "nulib.h"
 #include "nulib/file.h"
 #include "nulib/string.h"
+#include "ai5/cg.h"
 
 #include "cli.h"
-#include "cg.h"
 
 enum {
 	LOPT_OUTPUT = 256,

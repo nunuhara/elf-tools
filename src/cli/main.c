@@ -20,10 +20,10 @@
 
 #include "nulib.h"
 #include "nulib/file.h"
+#include "ai5/game.h"
 
 #include "cli.h"
 #include "mes.h"
-#include "game.h"
 
 enum game_id target_game = GAME_ISAKU;
 

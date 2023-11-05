@@ -24,10 +24,10 @@
 #include "nulib/file.h"
 #include "nulib/lzss.h"
 #include "nulib/port.h"
+#include "ai5/game.h"
 
 #include "cli.h"
 #include "arc.h"
-#include "game.h"
 
 enum arc_file_type {
 	ARC_FILE_FS,
