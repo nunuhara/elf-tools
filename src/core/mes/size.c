@@ -56,7 +56,7 @@ static uint32_t _expression_size(struct mes_expression *expr)
 		len += _expression_size(expr->sub_a) + _expression_size(expr->sub_b);
 		break;
 	case MES_EXPR_RAND:
-		if (target_game == GAME_DOUKYUUSEI) {
+		if (ai5_target_game == GAME_DOUKYUUSEI) {
 			len += 2;
 		} else {
 			len += _expression_size(expr->sub_a);

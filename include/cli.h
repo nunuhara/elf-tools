@@ -34,6 +34,5 @@ extern struct command cmd_mes_compile;
 extern struct command cmd_mes_decompile;
 
 enum game_id parse_game_id(const char *str);
-void set_game(const char *name);
 
 #endif // ELF_TOOLS_CLI_H

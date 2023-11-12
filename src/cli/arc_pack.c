@@ -328,7 +328,7 @@ static struct arc_metadata game_keys[] = {
 
 static void set_key_by_game(const char *name, struct arc_metadata *meta)
 {
-	enum game_id id = parse_game_id(name);
+	enum ai5_game_id id = ai5_parse_game_id(name);
 	if (id >= ARRAY_SIZE(game_keys))
 		sys_error("Key for game \"%s\" is unknown.\n", name);
 	*meta = game_keys[id];

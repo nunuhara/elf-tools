@@ -25,7 +25,7 @@
 #include "cli.h"
 #include "mes.h"
 
-enum game_id target_game = GAME_ISAKU;
+enum ai5_game_id target_game = GAME_ISAKU;
 
 struct command cmd_arc = {
 	.name = "arc",
@@ -91,38 +91,9 @@ struct command cmd_elf = {
 
 struct game_name {
 	const char *name;
-	enum game_id id;
+	enum ai5_game_id id;
 	const char *description;
 };
-
-static struct game_name game_names[] = {
-	{ "aishimai",   GAME_AI_SHIMAI,    "愛姉妹 ～二人の果実～" },
-	{ "beyond",     GAME_BEYOND,       "ビ・ ヨンド ～黒大将に見られてる～" },
-	{ "doukyuusei", GAME_DOUKYUUSEI,   "同級生 Windows版" },
-	{ "isaku",      GAME_ISAKU,        "遺作 リニューアル" },
-	{ "koihime",    GAME_KOIHIME,      "恋姫" },
-	{ "yukinojou",  GAME_YUKINOJOU,    "あしたの雪之丞" },
-	{ "yuno",       GAME_ELF_CLASSICS, "この世の果てで恋を唄う少女YU-NO (エルフclassics)" },
-};
-
-enum game_id parse_game_id(const char *str)
-{
-	for (unsigned i = 0; i < ARRAY_SIZE(game_names); i++) {
-		if (!strcmp(str, game_names[i].name))
-			return game_names[i].id;
-	}
-	sys_warning("Unrecognized game name: %s\n", str);
-	sys_warning("Valid names are:\n");
-	for (unsigned i = 0; i < ARRAY_SIZE(game_names); i++) {
-		sys_warning("    %-11s - %s\n", game_names[i].name, game_names[i].description);
-	}
-	sys_exit(EXIT_FAILURE);
-}
-
-void set_game(const char *name)
-{
-	mes_set_game((target_game = parse_game_id(name)));
-}
 
 int main(int argc, char *argv[])
 {

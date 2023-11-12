@@ -79,7 +79,7 @@ void pack_string(struct buffer *mes, const string text, bool terminated)
 
 static void _pack_expression(struct buffer *mes, struct mes_expression *expr)
 {
-	if (expr->op == MES_EXPR_RAND && target_game == GAME_DOUKYUUSEI) {
+	if (expr->op == MES_EXPR_RAND && ai5_target_game == GAME_DOUKYUUSEI) {
 		assert(expr->sub_a);
 		buffer_write_u8(mes, mes_expr_opcode(MES_EXPR_RAND));
 		switch (expr->sub_a->op) {

@@ -22,6 +22,7 @@
 #include "nulib.h"
 #include "nulib/file.h"
 #include "nulib/port.h"
+#include "ai5/game.h"
 
 #include "cli.h"
 #include "mes.h"
@@ -62,7 +63,7 @@ int cli_mes_decompile(int argc, char *argv[])
 			break;
 		case 'g':
 		case LOPT_GAME:
-			set_game(optarg);
+			ai5_set_game(optarg);
 			break;
 		case LOPT_FLAT:
 			mode = DECOMPILE_FLAT;

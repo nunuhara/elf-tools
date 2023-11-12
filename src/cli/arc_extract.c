@@ -26,6 +26,7 @@
 #include "nulib/string.h"
 #include "ai5/arc.h"
 #include "ai5/cg.h"
+#include "ai5/game.h"
 
 #include "cli.h"
 #include "mes.h"
@@ -247,7 +248,7 @@ int arc_extract(int argc, char *argv[])
 			break;
 		case 'g':
 		case LOPT_GAME:
-			set_game(optarg);
+			ai5_set_game(optarg);
 			break;
 		case 'n':
 		case LOPT_NAME:
