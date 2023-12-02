@@ -105,7 +105,7 @@ static bool extract_mes(struct archive_data *data, const char *output_file)
 	return true;
 }
 
-static bool extract_gxx(struct archive_data *data, const char *output_file)
+static bool extract_cg(struct archive_data *data, const char *output_file)
 {
 	struct port out;
 	if (!open_output_file(output_file, &out))
@@ -155,8 +155,9 @@ static bool extract_file(struct archive_data *data, const char *output_file)
 	const char *ext = file_extension(data->name);
 	if (!strcasecmp(ext, "MES"))
 		return extract_mes(data, output_file);
-	if (!strcasecmp(ext, "G16") || !strcasecmp(ext, "G24") || !strcasecmp(ext, "G32"))
-		return extract_gxx(data, output_file);
+	if (!strcasecmp(ext, "GP8") || !strcasecmp(ext, "G16") || !strcasecmp(ext, "G24")
+			|| !strcasecmp(ext, "G32"))
+		return extract_cg(data, output_file);
 	if (!strcasecmp(ext, "S4"))
 		return extract_s4(data, output_file);
 	return extract_raw(data, output_file);

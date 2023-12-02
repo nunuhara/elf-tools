@@ -21,6 +21,7 @@ incdirs = include_directories('include')
 
 sources = [
   'src/core/anim/s4_pack.c',
+  'src/core/anim/s4_render.c',
   'src/core/mes/ctor.c',
   'src/core/mes/decompile.c',
   'src/core/mes/flat_parser.c',
@@ -28,8 +29,10 @@ sources = [
   'src/core/mes/print.c',
   'src/core/mes/size.c',
   'src/core/mes/text_parser.c',
+  'src/core/file.c',
   'src/cli/anim_compile.c',
   'src/cli/anim_decompile.c',
+  'src/cli/anim_render.c',
   'src/cli/arc_extract.c',
   'src/cli/arc_list.c',
   'src/cli/arc_pack.c',

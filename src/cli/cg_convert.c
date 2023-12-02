@@ -24,6 +24,7 @@
 #include "ai5/cg.h"
 
 #include "cli.h"
+#include "file.h"
 
 enum {
 	LOPT_OUTPUT = 256,
@@ -59,22 +60,8 @@ static int cli_cg_convert(int argc, char *argv[])
 	if (out_type < 0)
 		sys_error("Unable to determine CG type for output \"%s\".\n", output_file);
 
-	// determine input CG type
-	enum cg_type in_type = cg_type_from_name(argv[0]);
-	if (in_type < 0)
-		sys_error("Unable to determine CG type for input \"%s\".\n", argv[0]);
-
-	// read input CG
-	size_t data_size;
-	uint8_t *data = file_read(argv[0], &data_size);
-	if (!data)
-		sys_error("Error reading input file \"%s\": %s", argv[0], strerror(errno));
-
 	// decode input CG
-	struct cg *cg = cg_load(data, data_size, in_type);
-	free(data);
-	if (!cg)
-		sys_error("Failed to decode CG.\n");
+	struct cg *cg = file_cg_load(argv[0]);
 
 	// open output file
 	FILE *f = file_open_utf8(output_file, "wb");

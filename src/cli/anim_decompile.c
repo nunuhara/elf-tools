@@ -25,6 +25,7 @@
 #include "ai5/s4.h"
 
 #include "cli.h"
+#include "file.h"
 
 enum {
 	LOPT_OUTPUT = 256,
@@ -53,18 +54,9 @@ static int cli_anim_decompile(int argc, char *argv[])
 		command_usage_error(&cmd_anim_decompile, "Wrong number of arguments.\n");
 
 	if (!output_file)
-		output_file = file_replace_extension(argv[0], "SS4");
+		output_file = file_replace_extension(path_basename(argv[0]), "SS4");
 
-	// read input file
-	size_t data_size;
-	uint8_t *data = file_read(argv[0], &data_size);
-	if (!data)
-		sys_error("Error reading input file \"%s\": %s\n", argv[0], strerror(errno));
-
-	// deserialize input file
-	struct s4 *s4 = s4_parse(data, data_size);
-	if (!s4)
-		sys_error("Failed to parse s4 file: %s\n", argv[0]);
+	struct s4 *s4 = file_s4_load(argv[0]);
 
 	// open output file
 	struct port out;
@@ -82,7 +74,6 @@ static int cli_anim_decompile(int argc, char *argv[])
 	string_free(output_file);
 	port_close(&out);
 	s4_free(s4);
-	free(data);
 	return 0;
 }
 

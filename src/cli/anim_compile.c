@@ -24,10 +24,8 @@
 #include "nulib/string.h"
 #include "ai5/s4.h"
 
+#include "anim.h"
 #include "cli.h"
-
-struct s4 *s4_parse_script(const char *path);
-uint8_t *s4_pack(struct s4 *in, size_t *size_out);
 
 enum {
 	LOPT_OUTPUT = 256,
@@ -56,7 +54,7 @@ static int cli_anim_compile(int argc, char *argv[])
 		command_usage_error(&cmd_anim_decompile, "Wrong number of arguments.\n");
 
 	if (!output_file)
-		output_file = file_replace_extension(argv[0], "SS4");
+		output_file = file_replace_extension(path_basename(argv[0]), "S4");
 
 	// parse input file
 	struct s4 *s4 = s4_parse_script(argv[0]);
@@ -68,9 +66,8 @@ static int cli_anim_compile(int argc, char *argv[])
 	if (!data)
 		sys_error("Failed to serialize output file\n");
 
-	const char *out = output_file ? output_file : "OUT.S4";
-	if (!file_write(out, data, size))
-		sys_error("Failed to write output file \"%s\": %s\n", out, strerror(errno));
+	if (!file_write(output_file, data, size))
+		sys_error("Failed to write output file \"%s\": %s\n", output_file, strerror(errno));
 
 	string_free(output_file);
 	s4_free(s4);

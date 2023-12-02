@@ -35,6 +35,7 @@ struct command cmd_anim = {
 	.commands = {
 		&cmd_anim_compile,
 		&cmd_anim_decompile,
+		&cmd_anim_render,
 		NULL
 	}
 };

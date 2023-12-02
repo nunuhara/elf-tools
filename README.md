@@ -48,12 +48,15 @@ instructions. E.g.
 
 The currently implemented commands are:
 
-    elf arc extract   - Extract an archive file
-    elf arc list      - List the contents of an archive file
-    elf arc pack      - Create/modify an archive file
-    elf cg  convert   - Convert an image file to another format
-    elf mes compile   - Compile a .mes file
-    elf mes decompile - Decompile a .mes file
+    elf anim compile   - Compile an animation file
+    elf anim decompile - Decompile an animation file
+    elf anim render    - Render an animation file
+    elf arc  extract   - Extract an archive file
+    elf arc  list      - List the contents of an archive file
+    elf arc  pack      - Create/modify an archive file
+    elf cg   convert   - Convert an image file to another format
+    elf mes  compile   - Compile a .mes file
+    elf mes  decompile - Decompile a .mes file
 
 ### How-To
 
