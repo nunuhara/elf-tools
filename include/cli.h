@@ -20,6 +20,9 @@
 #include "nulib/command.h"
 
 extern struct command cmd_elf;
+extern struct command cmd_anim;
+extern struct command cmd_anim_compile;
+extern struct command cmd_anim_decompile;
 extern struct command cmd_arc;
 extern struct command cmd_arc_extract;
 extern struct command cmd_arc_list;
