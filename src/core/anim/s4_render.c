@@ -316,7 +316,7 @@ static bool stream_render(struct s4 *anim, unsigned stream, struct stream_state 
 		}
 		break;
 	}
-	return false;
+	return true;
 }
 
 static struct cg *make_blank_cg(struct cg *src)
