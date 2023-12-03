@@ -80,6 +80,8 @@ static void copy_clip(struct s4_target *src, struct s4_target *dst, struct s4_si
 		src->y -= dst->y;
 		dst->y = 0;
 	}
+	if (dim->w < 0 || dim->h < 0)
+		return;
 	if (unlikely(src->x + dim->w > s_src->w)) {
 		dim->w = s_src->w - src->x;
 	}
@@ -293,9 +295,8 @@ static bool stream_render(struct s4 *anim, unsigned stream, struct stream_state 
 		state->ip++;
 		break;
 	case S4_OP_LOOP_END:
-		if (state->loop_count) {
+		if (--state->loop_count) {
 			state->ip = state->loop_start;
-			state->loop_count--;
 		} else {
 			state->ip++;
 		}
@@ -306,9 +307,8 @@ static bool stream_render(struct s4 *anim, unsigned stream, struct stream_state 
 		state->ip++;
 		break;
 	case S4_OP_LOOP2_END:
-		if (state->loop2_count) {
+		if (--state->loop2_count) {
 			state->ip = state->loop2_start;
-			state->loop2_count--;
 		} else {
 			state->ip++;
 		}
