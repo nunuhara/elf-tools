@@ -25,6 +25,7 @@
 
 struct stream_state {
 	bool halted;
+	bool dirty;
 	unsigned ip;
 	unsigned stalling;
 	unsigned loop_start;
@@ -260,11 +261,11 @@ static bool stream_render(struct s4 *anim, unsigned stream, struct stream_state 
 {
 	if (state->stalling) {
 		state->stalling--;
-		return false;
+		return true;
 	}
 	if (state->ip >= vector_length(anim->streams[stream])) {
 		state->halted = true;
-		return false;
+		return true;
 	}
 
 	struct s4_instruction instr = vector_A(anim->streams[stream], state->ip);
@@ -272,7 +273,8 @@ static bool stream_render(struct s4 *anim, unsigned stream, struct stream_state 
 	case S4_OP_DRAW:
 		stream_render_draw(&vector_A(anim->draw_calls, instr.arg), src, dst);
 		state->ip++;
-		return true;;
+		state->dirty = true;
+		return false;
 	case S4_OP_NOOP:
 	case S4_OP_CHECK_STOP:
 		state->ip++;
@@ -295,7 +297,7 @@ static bool stream_render(struct s4 *anim, unsigned stream, struct stream_state 
 		state->ip++;
 		break;
 	case S4_OP_LOOP_END:
-		if (--state->loop_count) {
+		if (state->loop_count && --state->loop_count) {
 			state->ip = state->loop_start;
 		} else {
 			state->ip++;
@@ -307,7 +309,7 @@ static bool stream_render(struct s4 *anim, unsigned stream, struct stream_state 
 		state->ip++;
 		break;
 	case S4_OP_LOOP2_END:
-		if (--state->loop2_count) {
+		if (state->loop2_count && --state->loop2_count) {
 			state->ip = state->loop2_start;
 		} else {
 			state->ip++;
@@ -369,17 +371,20 @@ struct s4_frame *s4_render_frames(struct s4 *anim, struct cg *src, struct cg *ds
 
 	for (unsigned frame = 0; frame < max_frames;) {
 		bool halted = true;
-		bool dirty = false;
+		bool flush = false;
 		for (int stream = 0; stream < S4_MAX_STREAMS; stream++) {
 			if (!state[stream].halted) {
 				halted = false;
-				if (stream_render(anim, stream, &state[stream], src, dst))
-					dirty = true;
+				if (stream_render(anim, stream, &state[stream], src, dst)
+						&& state[stream].dirty) {
+					flush = true;
+					state[stream].dirty = false;
+				}
 			}
 		}
 		if (halted)
 			break;
-		if (dirty) {
+		if (flush) {
 			frame++;
 			if (frame >= max_frames)
 				break;
