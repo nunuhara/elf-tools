@@ -30,6 +30,7 @@ sources = [
   'src/core/mes/size.c',
   'src/core/mes/text_parser.c',
   'src/core/file.c',
+  'src/cli/a6_decompile.c',
   'src/cli/anim_compile.c',
   'src/cli/anim_decompile.c',
   'src/cli/anim_render.c',

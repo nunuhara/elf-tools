@@ -27,10 +27,22 @@
 
 enum ai5_game_id target_game = GAME_ISAKU;
 
+struct command cmd_a6 = {
+	.name = "a6",
+	.usage = "<command> ...",
+	.description = "Tools for compiling and decompiling .a6 files",
+	.parent = &cmd_elf,
+	.commands = {
+		//&cmd_a6_compile,
+		&cmd_a6_decompile,
+		NULL
+	}
+};
+
 struct command cmd_anim = {
 	.name = "anim",
 	.usage = "<command> ...",
-	.description = "Tools for compiling and decompileing animation files",
+	.description = "Tools for compiling and decompiling animation files",
 	.parent = &cmd_elf,
 	.commands = {
 		&cmd_anim_compile,
@@ -94,6 +106,7 @@ struct command cmd_elf = {
 	.description = "Toolkit for extracting and editing Elf/Silky's file formats",
 	.parent = NULL,
 	.commands = {
+		&cmd_a6,
 		&cmd_anim,
 		&cmd_arc,
 		&cmd_cg,
