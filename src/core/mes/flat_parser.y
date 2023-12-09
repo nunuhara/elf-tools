@@ -93,6 +93,8 @@ stmt
 	  { $$ = mes_stmt_goto($2); }
 	| CALL params ';'
 	  { $$ = mf_stmt_call($2); }
+	| UTIL '.' path params ';'
+	  { $$ = mf_stmt_util($3, $4); }
 	| UTIL params ';'
 	  { $$ = mes_stmt_util($2); }
 	| LINE I_CONSTANT ';'

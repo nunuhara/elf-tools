@@ -254,6 +254,15 @@ struct mes_statement *mf_stmt_named_sys(mes_qname name, mes_parameter_list _para
 	return stmt;
 }
 
+struct mes_statement *mf_stmt_util(mes_qname name, mes_parameter_list params)
+{
+	mes_parameter_list call = mes_resolve_util(name);
+	struct mes_statement *stmt = mes_stmt(MES_STMT_UTIL);
+	stmt->UTIL.params = append_params(call, params);
+	vector_destroy(params);
+	return stmt;
+}
+
 struct mes_statement *mf_stmt_call(mes_parameter_list params)
 {
 	if (vector_length(params) < 1)

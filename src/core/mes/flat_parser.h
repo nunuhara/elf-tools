@@ -78,6 +78,7 @@ void mf_push_label_ref(struct mes_statement *stmt, string name);
 
 struct mes_statement *mf_stmt_sys_named_var_set(string name, mes_expression_list vals);
 struct mes_statement *mf_stmt_named_sys(mes_qname name, mes_parameter_list params);
+struct mes_statement *mf_stmt_util(mes_qname name, mes_parameter_list params);
 struct mes_statement *mf_stmt_call(mes_parameter_list params);
 
 struct mes_expression *mf_parse_constant(string text);

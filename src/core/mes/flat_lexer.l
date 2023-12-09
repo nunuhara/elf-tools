@@ -69,7 +69,6 @@ WS  [ \t\v\f]
 "goto" { return GOTO; }
 "jump" { return JUMP; }
 "call" { return CALL; }
-"util" { return UTIL; }
 "line" { return LINE; }
 "menuexec" { return MENUEXEC; }
 "jz" { return JZ; }
@@ -80,6 +79,7 @@ WS  [ \t\v\f]
 
 	/* namespaces */
 "System" { return SYSTEM; }
+"Util" { return UTIL; }
 
 {L}{AT}* { RETURN_STRING(IDENTIFIER); }
 
