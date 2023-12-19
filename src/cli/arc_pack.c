@@ -288,7 +288,19 @@ static struct arc_metadata game_keys[] = {
 		.size_key    = 0xf3107572,
 		.name_key    = 0xfa,
 	},
-	[GAME_ELF_CLASSICS] = {
+	[GAME_YUNO] = {
+		.name_length = 20,
+		.offset_key  = 0x68820811,
+		.size_key    = 0x33656755,
+		.name_key    = 0x03,
+	},
+	[GAME_SHANGRLIA] = {
+		.name_length = 20,
+		.offset_key  = 0x68820811,
+		.size_key    = 0x33656755,
+		.name_key    = 0x03,
+	},
+	[GAME_SHANGRLIA2] = {
 		.name_length = 20,
 		.offset_key  = 0x68820811,
 		.size_key    = 0x33656755,

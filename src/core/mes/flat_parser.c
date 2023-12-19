@@ -223,10 +223,14 @@ struct mes_statement *mf_stmt_sys_named_var_set(string name, mes_expression_list
 	int no = mes_resolve_sysvar(name, &dword);
 	if (no < 0)
 		PARSE_ERROR("Invalid system variable: %s", name);
+	uint8_t i = dword ? mes_sysvar32_index(no) : mes_sysvar16_index(no);
+	if (i == MES_CODE_INVALID)
+		PARSE_ERROR("System variable is not valid for game: %s", name);
+
 	string_free(name);
 
 	struct mes_expression *e = mes_expr(MES_EXPR_IMM);
-	e->arg8 = no;
+	e->arg8 = i;
 	return dword ? mes_stmt_sys_var32_set(e, vals) : mes_stmt_sys_var16_set(e, vals);
 }
 
@@ -288,10 +292,13 @@ struct mes_expression *mf_expr_named_sysvar(string name)
 	int no = mes_resolve_sysvar(name, &dword);
 	if (no < 0)
 		PARSE_ERROR("Invalid system variable: %s", name);
+	uint8_t i = dword ? mes_sysvar32_index(no) : mes_sysvar16_index(no);
+	if (i == MES_CODE_INVALID)
+		PARSE_ERROR("System variable is not valid for game: %s", name);
 	string_free(name);
 
 	struct mes_expression *index = mes_expr(MES_EXPR_IMM);
-	index->arg8 = no;
+	index->arg8 = i;
 	return dword ? mes_expr_system_var32(index) : mes_expr_system_var16(index);
 }
 
