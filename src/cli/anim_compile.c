@@ -22,13 +22,15 @@
 #include "nulib/file.h"
 #include "nulib/port.h"
 #include "nulib/string.h"
-#include "ai5/s4.h"
+#include "ai5/anim.h"
+#include "ai5/game.h"
 
 #include "anim.h"
 #include "cli.h"
 
 enum {
 	LOPT_OUTPUT = 256,
+	LOPT_GAME,
 };
 
 static int cli_anim_compile(int argc, char *argv[])
@@ -45,6 +47,9 @@ static int cli_anim_compile(int argc, char *argv[])
 		case LOPT_OUTPUT:
 			output_file = string_new(optarg);
 			break;
+		case LOPT_GAME:
+			ai5_set_game(optarg);
+			break;
 		}
 	}
 	argc -= optind;
@@ -57,12 +62,12 @@ static int cli_anim_compile(int argc, char *argv[])
 		output_file = file_replace_extension(path_basename(argv[0]), "S4");
 
 	// parse input file
-	struct s4 *s4 = s4_parse_script(argv[0]);
-	if (!s4)
-		sys_error("Failed to parse s4 script file: %s\n", argv[0]);
+	struct anim *anim = anim_parse_script(argv[0]);
+	if (!anim)
+		sys_error("Failed to parse animation script file: %s\n", argv[0]);
 
 	size_t size;
-	uint8_t *data = s4_pack(s4, &size);
+	uint8_t *data = anim_pack(anim, &size);
 	if (!data)
 		sys_error("Failed to serialize output file\n");
 
@@ -70,7 +75,7 @@ static int cli_anim_compile(int argc, char *argv[])
 		sys_error("Failed to write output file \"%s\": %s\n", output_file, strerror(errno));
 
 	string_free(output_file);
-	s4_free(s4);
+	anim_free(anim);
 	free(data);
 	return 0;
 }
@@ -83,6 +88,7 @@ struct command cmd_anim_compile = {
 	.fun = cli_anim_compile,
 	.options = {
 		{ "output", 'o', "Set the output file path", required_argument, LOPT_OUTPUT },
+		{ "game", 0, "Specify the target game", required_argument, LOPT_GAME },
 		{ 0 }
 	}
 };

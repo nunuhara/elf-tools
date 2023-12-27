@@ -17,10 +17,10 @@
 #ifndef ELF_TOOLS_FILE_H
 #define ELF_TOOLS_FILE_H
 
-struct s4;
+struct anim;
 struct cg;
 
-struct s4 *file_s4_load(const char *path);
+struct anim *file_anim_load(const char *path);
 struct cg *file_cg_load(const char *path);
 
 #endif // ELF_TOOLS_FILE_H

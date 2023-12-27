@@ -22,13 +22,15 @@
 #include "nulib/file.h"
 #include "nulib/port.h"
 #include "nulib/string.h"
-#include "ai5/s4.h"
+#include "ai5/anim.h"
+#include "ai5/game.h"
 
 #include "cli.h"
 #include "file.h"
 
 enum {
 	LOPT_OUTPUT = 256,
+	LOPT_GAME,
 };
 
 static int cli_anim_decompile(int argc, char *argv[])
@@ -45,6 +47,9 @@ static int cli_anim_decompile(int argc, char *argv[])
 		case LOPT_OUTPUT:
 			output_file = string_new(optarg);
 			break;
+		case LOPT_GAME:
+			ai5_set_game(optarg);
+			break;
 		}
 	}
 	argc -= optind;
@@ -56,7 +61,7 @@ static int cli_anim_decompile(int argc, char *argv[])
 	if (!output_file)
 		output_file = file_replace_extension(path_basename(argv[0]), "SS4");
 
-	struct s4 *s4 = file_s4_load(argv[0]);
+	struct anim *anim = file_anim_load(argv[0]);
 
 	// open output file
 	struct port out;
@@ -69,11 +74,11 @@ static int cli_anim_decompile(int argc, char *argv[])
 		port_file_init(&out, stdout);
 	}
 
-	s4_print(&out, s4);
+	anim_print(&out, anim);
 
 	string_free(output_file);
 	port_close(&out);
-	s4_free(s4);
+	anim_free(anim);
 	return 0;
 }
 
@@ -85,6 +90,7 @@ struct command cmd_anim_decompile = {
 	.fun = cli_anim_decompile,
 	.options = {
 		{ "output", 'o', "Set the output file path", required_argument, LOPT_OUTPUT },
+		{ "game", 0, "Specify the target game", required_argument, LOPT_GAME },
 		{ 0 }
 	}
 };

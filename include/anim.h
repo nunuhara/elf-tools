@@ -20,12 +20,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-struct s4;
+struct anim;
 struct cg;
 
-struct s4 *s4_parse_script(const char *path);
-uint8_t *s4_pack(struct s4 *in, size_t *size_out);
-uint8_t *s4_render_gif(struct s4 *anim, struct cg *src, struct cg *dst,
+struct anim *anim_parse_script(const char *path);
+uint8_t *anim_pack(struct anim *in, size_t *size_out);
+uint8_t *anim_render_gif(struct anim *anim, struct cg *src, struct cg *dst,
 		unsigned max_frames, size_t *size_out);
 
 #endif // ELF_TOOLS_ANIM_H

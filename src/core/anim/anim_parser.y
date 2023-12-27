@@ -1,4 +1,4 @@
-%define api.prefix {s4_script_}
+%define api.prefix {anim_script_}
 %define parse.error detailed
 %define parse.lac full
 
@@ -10,16 +10,16 @@
 #include "nulib.h"
 #include "nulib/file.h"
 #include "nulib/vector.h"
-#include "s4_parser.tab.h"
+#include "anim_parser.tab.h"
 
-int s4_script_lex();
-extern FILE *s4_script_in;
-extern int s4_script_lineno;
+int anim_script_lex();
+extern FILE *anim_script_in;
+extern int anim_script_lineno;
 
 #define PARSE_ERROR(fmt, ...) \
-	sys_error("ERROR: At line %d: " fmt "\n", s4_script_lineno, ##__VA_ARGS__)
+	sys_error("ERROR: At line %d: " fmt "\n", anim_script_lineno, ##__VA_ARGS__)
 
-static struct s4 program;
+static struct anim program;
 
 static FILE *open_file(const char *file)
 {
@@ -28,39 +28,39 @@ static FILE *open_file(const char *file)
 	return file_open_utf8(file, "rb");
 }
 
-struct s4 *s4_parse_script(const char *path)
+struct anim *anim_parse_script(const char *path)
 {
-	struct s4 *s4 = NULL;
+	struct anim *anim = NULL;
 
-	s4_script_in = open_file(path);
-	if (!s4_script_in) {
+	anim_script_in = open_file(path);
+	if (!anim_script_in) {
 		WARNING("Failed to open input file \"%s\": %s", path, strerror(errno));
 		return NULL;
 	}
 
-	program = (struct s4){0};
-	if (s4_script_parse()) {
+	program = (struct anim){0};
+	if (anim_script_parse()) {
 		WARNING("Failed to parse file: %s", path);
 		goto end;
 	}
 
-	s4 = xmalloc(sizeof(struct s4));
-	*s4 = program;
+	anim = xmalloc(sizeof(struct anim));
+	*anim = program;
 end:
-	if (s4_script_in != stdin)
-		fclose(s4_script_in);
-	s4_script_in = NULL;
-	return s4;
+	if (anim_script_in != stdin)
+		fclose(anim_script_in);
+	anim_script_in = NULL;
+	return anim;
 }
 
-void s4_script_error(const char *s)
+void anim_script_error(const char *s)
 {
 	PARSE_ERROR("%s", s);
 }
 
-static void push_stream(s4_stream stream)
+static void push_stream(anim_stream stream)
 {
-	for (int i = 0; i < S4_MAX_STREAMS; i++) {
+	for (int i = 0; i < ANIM_MAX_STREAMS; i++) {
 		if (vector_length(program.streams[i]) == 0) {
 			program.streams[i] = stream;
 			return;
@@ -69,46 +69,46 @@ static void push_stream(s4_stream stream)
 	ERROR("Too many streams");
 }
 
-static bool s4_target_eq(struct s4_target *a, struct s4_target *b)
+static bool anim_target_eq(struct anim_target *a, struct anim_target *b)
 {
 	return a->i == b->i && a->x == b->x && a->y == b->y;
 }
 
-static bool s4_size_eq(struct s4_size *a, struct s4_size *b)
+static bool anim_size_eq(struct anim_size *a, struct anim_size *b)
 {
 	return a->w == b->w && a->h == b->h;
 }
 
-static bool s4_color_eq(struct s4_color *a, struct s4_color *b)
+static bool anim_color_eq(struct anim_color *a, struct anim_color *b)
 {
 	return a->r == b->r && a->g == b->g && a->b == b->b;
 }
 
-static bool draw_call_eq(struct s4_draw_call *a, struct s4_draw_call *b)
+static bool draw_call_eq(struct anim_draw_call *a, struct anim_draw_call *b)
 {
 	if (a->op != b->op)
 		return false;
 	switch (a->op) {
-	case S4_DRAW_OP_FILL:
-		return s4_target_eq(&a->fill.dst, &b->fill.dst)
-				&& s4_size_eq(&a->fill.dim, &b->fill.dim);
-	case S4_DRAW_OP_COPY:
-	case S4_DRAW_OP_COPY_MASKED:
-	case S4_DRAW_OP_SWAP:
-		return s4_target_eq(&a->copy.src, &b->copy.src)
-				&& s4_target_eq(&a->copy.dst, &b->copy.dst)
-				&& s4_size_eq(&a->copy.dim, &b->copy.dim);
-	case S4_DRAW_OP_COMPOSE:
-		return s4_target_eq(&a->compose.fg, &b->compose.fg)
-				&& s4_target_eq(&a->compose.bg, &b->compose.bg)
-				&& s4_target_eq(&a->compose.dst, &b->compose.dst)
-				&& s4_size_eq(&a->compose.dim, &b->compose.dim);
-	case S4_DRAW_OP_SET_COLOR:
+	case ANIM_DRAW_OP_FILL:
+		return anim_target_eq(&a->fill.dst, &b->fill.dst)
+				&& anim_size_eq(&a->fill.dim, &b->fill.dim);
+	case ANIM_DRAW_OP_COPY:
+	case ANIM_DRAW_OP_COPY_MASKED:
+	case ANIM_DRAW_OP_SWAP:
+		return anim_target_eq(&a->copy.src, &b->copy.src)
+				&& anim_target_eq(&a->copy.dst, &b->copy.dst)
+				&& anim_size_eq(&a->copy.dim, &b->copy.dim);
+	case ANIM_DRAW_OP_COMPOSE:
+		return anim_target_eq(&a->compose.fg, &b->compose.fg)
+				&& anim_target_eq(&a->compose.bg, &b->compose.bg)
+				&& anim_target_eq(&a->compose.dst, &b->compose.dst)
+				&& anim_size_eq(&a->compose.dim, &b->compose.dim);
+	case ANIM_DRAW_OP_SET_COLOR:
 		return a->set_color.i == b->set_color.i
-				&& s4_color_eq(&a->set_color.color, &b->set_color.color);
-	case S4_DRAW_OP_SET_PALETTE:
+				&& anim_color_eq(&a->set_color.color, &b->set_color.color);
+	case ANIM_DRAW_OP_SET_PALETTE:
 		for (int i = 0; i < 16; i++) {
-			if (!s4_color_eq(&a->set_palette.colors[i], &b->set_palette.colors[i]))
+			if (!anim_color_eq(&a->set_palette.colors[i], &b->set_palette.colors[i]))
 				return false;
 		}
 		return true;
@@ -116,7 +116,7 @@ static bool draw_call_eq(struct s4_draw_call *a, struct s4_draw_call *b)
 	return false;
 }
 
-static unsigned push_draw_call(struct s4_draw_call *call)
+static unsigned push_draw_call(struct anim_draw_call *call)
 {
 	for (int i = 0; i < vector_length(program.draw_calls); i++) {
 		if (draw_call_eq(call, &vector_A(program.draw_calls, i)))
@@ -125,31 +125,31 @@ static unsigned push_draw_call(struct s4_draw_call *call)
 	if (vector_length(program.draw_calls) + 20 >= 256)
 		PARSE_ERROR("Too many draw calls");
 	unsigned no = vector_length(program.draw_calls);
-	vector_push(struct s4_draw_call, program.draw_calls, *call);
+	vector_push(struct anim_draw_call, program.draw_calls, *call);
 	return no;
 }
 
-static s4_stream push_instruction(s4_stream stream, struct s4_instruction instruction)
+static anim_stream push_instruction(anim_stream stream, struct anim_instruction instruction)
 {
-	vector_push(struct s4_instruction, stream, instruction);
+	vector_push(struct anim_instruction, stream, instruction);
 	return stream;
 }
 
-static struct s4_instruction make_instruction(enum s4_opcode op, uint8_t arg)
+static struct anim_instruction make_instruction(enum anim_opcode op, uint8_t arg)
 {
-	return (struct s4_instruction) { .op = op, .arg = arg };
+	return (struct anim_instruction) { .op = op, .arg = arg };
 }
 
-static struct s4_instruction make_draw_call(struct s4_draw_call *call)
+static struct anim_instruction make_draw_call(struct anim_draw_call *call)
 {
 	uint8_t no = push_draw_call(call);
-	return make_instruction(S4_OP_DRAW, no);
+	return make_instruction(ANIM_OP_DRAW, no);
 }
 
-static struct s4_instruction make_fill(struct s4_target target, struct s4_size size)
+static struct anim_instruction make_fill(struct anim_target target, struct anim_size size)
 {
-	struct s4_draw_call call = {
-		.op = S4_DRAW_OP_FILL,
+	struct anim_draw_call call = {
+		.op = ANIM_DRAW_OP_FILL,
 		.fill = {
 			.dst = target,
 			.dim = size
@@ -158,10 +158,10 @@ static struct s4_instruction make_fill(struct s4_target target, struct s4_size s
 	return make_draw_call(&call);
 }
 
-static struct s4_instruction make_copy(enum s4_draw_opcode op, struct s4_target src,
-			struct s4_target dst, struct s4_size size)
+static struct anim_instruction make_copy(enum anim_draw_opcode op, struct anim_target src,
+			struct anim_target dst, struct anim_size size)
 {
-	struct s4_draw_call call = {
+	struct anim_draw_call call = {
 		.op = op,
 		.copy = {
 			.src = src,
@@ -172,11 +172,11 @@ static struct s4_instruction make_copy(enum s4_draw_opcode op, struct s4_target 
 	return make_draw_call(&call);
 }
 
-static struct s4_instruction make_compose(struct s4_target bg, struct s4_target fg,
-			struct s4_target dst, struct s4_size size)
+static struct anim_instruction make_compose(struct anim_target bg, struct anim_target fg,
+			struct anim_target dst, struct anim_size size)
 {
-	struct s4_draw_call call = {
-		.op = S4_DRAW_OP_COMPOSE,
+	struct anim_draw_call call = {
+		.op = ANIM_DRAW_OP_COMPOSE,
 		.compose = {
 			.fg = fg,
 			.bg = bg,
@@ -187,14 +187,14 @@ static struct s4_instruction make_compose(struct s4_target bg, struct s4_target 
 	return make_draw_call(&call);
 }
 
-static struct s4_instruction make_set_color(uint8_t i, struct s4_color color)
+static struct anim_instruction make_set_color(uint8_t i, struct anim_color color)
 {
 	if (i != (color.b & 0xf)) {
 		WARNING("blue value %u will be clobbered by index %u", color.b, i);
 		color.b = i | (i << 4);
 	}
-	struct s4_draw_call call = {
-		.op = S4_DRAW_OP_SET_COLOR,
+	struct anim_draw_call call = {
+		.op = ANIM_DRAW_OP_SET_COLOR,
 		.set_color = {
 			.i = i,
 			.color = color
@@ -203,15 +203,15 @@ static struct s4_instruction make_set_color(uint8_t i, struct s4_color color)
 	return make_draw_call(&call);
 }
 
-static struct s4_instruction make_set_palette(struct s4_color c0, struct s4_color c1,
-			struct s4_color c2, struct s4_color c3, struct s4_color c4,
-			struct s4_color c5, struct s4_color c6, struct s4_color c7,
-			struct s4_color c8, struct s4_color c9, struct s4_color c10,
-			struct s4_color c11, struct s4_color c12, struct s4_color c13,
-			struct s4_color c14, struct s4_color c15)
+static struct anim_instruction make_set_palette(struct anim_color c0, struct anim_color c1,
+			struct anim_color c2, struct anim_color c3, struct anim_color c4,
+			struct anim_color c5, struct anim_color c6, struct anim_color c7,
+			struct anim_color c8, struct anim_color c9, struct anim_color c10,
+			struct anim_color c11, struct anim_color c12, struct anim_color c13,
+			struct anim_color c14, struct anim_color c15)
 {
-	struct s4_draw_call call = {
-		.op = S4_DRAW_OP_SET_PALETTE,
+	struct anim_draw_call call = {
+		.op = ANIM_DRAW_OP_SET_PALETTE,
 		.set_palette = {
 			.colors = {
 				[0] = c0, [1] = c1, [2] = c2, [3] = c3, [4] = c4, [5] = c5,
@@ -270,26 +270,26 @@ static uint16_t parse_x_dim(string str)
 	return n;
 }
 
-static struct s4_target make_target(string i, string x, string y)
+static struct anim_target make_target(string i, string x, string y)
 {
-	return (struct s4_target) {
+	return (struct anim_target) {
 		.i = parse_u1(i),
 		.x = parse_x_dim(x),
 		.y = parse_u16(y)
 	};
 }
 
-static struct s4_size make_size(string w, string h)
+static struct anim_size make_size(string w, string h)
 {
-	return (struct s4_size) {
+	return (struct anim_size) {
 		.w = parse_x_dim(w),
 		.h = parse_u16(h)
 	};
 }
 
-static struct s4_color make_color(string r, string g, string b)
+static struct anim_color make_color(string r, string g, string b)
 {
-	struct s4_color c = {
+	struct anim_color c = {
 		.r = parse_u4(r),
 		.g = parse_u4(g),
 		.b = parse_u4(b)
@@ -305,17 +305,17 @@ static struct s4_color make_color(string r, string g, string b)
 %union {
 	int token;
 	string string;
-	s4_stream stream;
-	struct s4_instruction instruction;
-	enum s4_draw_opcode draw_op;
-	struct s4_target target;
-	struct s4_size size;
-	struct s4_color color;
+	anim_stream stream;
+	struct anim_instruction instruction;
+	enum anim_draw_opcode draw_op;
+	struct anim_target target;
+	struct anim_size size;
+	struct anim_color color;
 }
 
 %code requires {
 	#include "nulib/string.h"
-	#include "ai5/s4.h"
+	#include "ai5/anim.h"
 }
 
 %token	<string>	I_CONSTANT
@@ -344,29 +344,29 @@ stream
 	;
 
 instructions
-	: instruction { $$ = push_instruction((s4_stream)vector_initializer, $1); }
+	: instruction { $$ = push_instruction((anim_stream)vector_initializer, $1); }
 	| instructions instruction { $$ = push_instruction($1, $2); }
 	;
 
 instruction
 	: NOOP ';'
-	{ $$ = make_instruction(S4_OP_NOOP, 0); }
+	{ $$ = make_instruction(ANIM_OP_NOOP, 0); }
 	| CHECK_STOP ';'
-	{ $$ = make_instruction(S4_OP_CHECK_STOP, 0); }
+	{ $$ = make_instruction(ANIM_OP_CHECK_STOP, 0); }
 	| STALL I_CONSTANT ';'
-	{ $$ = make_instruction(S4_OP_STALL, parse_u8($2)); }
+	{ $$ = make_instruction(ANIM_OP_STALL, parse_u8($2)); }
 	| RESET ';'
-	{ $$ = make_instruction(S4_OP_RESET, 0); }
+	{ $$ = make_instruction(ANIM_OP_RESET, 0); }
 	| HALT ';'
-	{ $$ = make_instruction(S4_OP_HALT, 0); }
+	{ $$ = make_instruction(ANIM_OP_HALT, 0); }
 	| LOOP_START I_CONSTANT ';'
-	{ $$ = make_instruction(S4_OP_LOOP_START, parse_u8($2)); }
+	{ $$ = make_instruction(ANIM_OP_LOOP_START, parse_u8($2)); }
 	| LOOP_END ';'
-	{ $$ = make_instruction(S4_OP_LOOP_END, 0); }
+	{ $$ = make_instruction(ANIM_OP_LOOP_END, 0); }
 	| LOOP2_START I_CONSTANT ';'
-	{ $$ = make_instruction(S4_OP_LOOP2_START, parse_u8($2)); }
+	{ $$ = make_instruction(ANIM_OP_LOOP2_START, parse_u8($2)); }
 	| LOOP2_END ';'
-	{ $$ = make_instruction(S4_OP_LOOP2_END, 0); }
+	{ $$ = make_instruction(ANIM_OP_LOOP2_END, 0); }
 	| FILL target '@' size ';'
 	{ $$ = make_fill($2, $4); }
 	| copy_fun target ARROW target '@' size ';'
@@ -380,9 +380,9 @@ instruction
 	;
 
 copy_fun
-	: COPY { $$ = S4_DRAW_OP_COPY; }
-	| COPY_MASKED { $$ = S4_DRAW_OP_COPY_MASKED; }
-	| SWAP { $$ = S4_DRAW_OP_SWAP; }
+	: COPY { $$ = ANIM_DRAW_OP_COPY; }
+	| COPY_MASKED { $$ = ANIM_DRAW_OP_COPY_MASKED; }
+	| SWAP { $$ = ANIM_DRAW_OP_SWAP; }
 	;
 
 target

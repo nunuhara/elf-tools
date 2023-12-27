@@ -18,18 +18,18 @@
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
-#include "s4_parser.tab.h"
+#include "anim_parser.tab.h"
 #include "nulib.h"
 #include "nulib/string.h"
 
 #define RETURN_STRING(tok_type) \
-    s4_script_lval.string = string_new_len(s4_script_text, s4_script_leng); return tok_type
+    anim_script_lval.string = string_new_len(anim_script_text, anim_script_leng); return tok_type
 
 %}
 
 %option noyywrap
 %option yylineno
-%option prefix="s4_script_"
+%option prefix="anim_script_"
 
 %%
 

@@ -22,8 +22,9 @@
 #include "nulib/file.h"
 #include "nulib/port.h"
 #include "nulib/string.h"
+#include "ai5/anim.h"
 #include "ai5/cg.h"
-#include "ai5/s4.h"
+#include "ai5/game.h"
 
 #include "anim.h"
 #include "cli.h"
@@ -31,6 +32,7 @@
 
 enum {
 	LOPT_OUTPUT = 256,
+	LOPT_GAME,
 	LOPT_BG,
 	LOPT_MAX_FRAMES,
 };
@@ -52,6 +54,9 @@ static int cli_anim_render(int argc, char *argv[])
 		case 'o':
 		case LOPT_OUTPUT:
 			output_file = string_new(optarg);
+			break;
+		case LOPT_GAME:
+			ai5_set_game(optarg);
 			break;
 		case LOPT_BG:
 			bg_file = string_new(optarg);
@@ -77,21 +82,21 @@ static int cli_anim_render(int argc, char *argv[])
 	}
 
 	// load animation and CGs
-	struct s4 *s4 = file_s4_load(argv[0]);
+	struct anim *anim = file_anim_load(argv[0]);
 	struct cg *cg = file_cg_load(argv[1]);
 	struct cg *bg = bg_file ? file_cg_load(bg_file) : NULL;
 
 	// render gif
 	size_t gif_size;
-	uint8_t *gif = s4_render_gif(s4, cg, bg, max_frames, &gif_size);
-	if (!file_write(output_file, gif, gif_size))
+	uint8_t *gif = anim_render_gif(anim, cg, bg, max_frames, &gif_size);
+	if (gif && !file_write(output_file, gif, gif_size))
 		sys_error("Failed to write output file \"%s\": %s", output_file,
 				strerror(errno));
 
 	string_free(output_file);
 	string_free(bg_file);
 	free(gif);
-	s4_free(s4);
+	anim_free(anim);
 	cg_free(cg);
 	cg_free(bg);
 	return 0;
@@ -106,6 +111,7 @@ struct command cmd_anim_render = {
 	.options = {
 		{ "output", 'o', "Set the output file path", required_argument, LOPT_OUTPUT },
 		{ "bg", 0, "Set the background CG", required_argument, LOPT_BG },
+		{ "game", 0, "Specify the target game", required_argument, LOPT_GAME },
 		{ "max-frames", 'f', "Set the maximum number of frames to render",
 		  required_argument, LOPT_MAX_FRAMES },
 		{ 0 }

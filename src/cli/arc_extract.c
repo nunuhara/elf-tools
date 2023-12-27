@@ -24,10 +24,10 @@
 #include "nulib/file.h"
 #include "nulib/port.h"
 #include "nulib/string.h"
+#include "ai5/anim.h"
 #include "ai5/arc.h"
 #include "ai5/cg.h"
 #include "ai5/game.h"
-#include "ai5/s4.h"
 
 #include "cli.h"
 #include "mes.h"
@@ -129,20 +129,20 @@ static bool extract_cg(struct archive_data *data, const char *output_file)
 	return true;
 }
 
-static bool extract_s4(struct archive_data *data, const char *output_file)
+static bool extract_anim(struct archive_data *data, const char *output_file)
 {
 	struct port out;
 	if (!open_output_file(output_file, &out))
 		return false;
 
-	struct s4 *s4 = s4_parse(data->data, data->size);
-	if (!s4) {
-		sys_warning("Failed to decompile .S4 file \"%s\".\n", data->name);
+	struct anim *anim = anim_parse(data->data, data->size);
+	if (!anim) {
+		sys_warning("Failed to decompile animation file \"%s\".\n", data->name);
 		port_close(&out);
 		return false;
 	}
-	s4_print(&out, s4);
-	s4_free(s4);
+	anim_print(&out, anim);
+	anim_free(anim);
 	port_close(&out);
 	return true;
 }
@@ -158,8 +158,8 @@ static bool extract_file(struct archive_data *data, const char *output_file)
 	if (!strcasecmp(ext, "GP8") || !strcasecmp(ext, "G16") || !strcasecmp(ext, "G24")
 			|| !strcasecmp(ext, "G32"))
 		return extract_cg(data, output_file);
-	if (!strcasecmp(ext, "S4"))
-		return extract_s4(data, output_file);
+	if (!strcasecmp(ext, "S4") || !strcasecmp(ext, "A"))
+		return extract_anim(data, output_file);
 	return extract_raw(data, output_file);
 }
 
@@ -213,8 +213,8 @@ static string get_output_path(const char *dir, const char *name)
 	}
 	if (!strcasecmp(ext, "G16") || !strcasecmp(ext, "G24") || !strcasecmp(ext, "G32"))
 		return make_output_path(path, name, "PNG");
-	if (!strcasecmp(ext, "S4"))
-		return make_output_path(path, name, "SS4");
+	if (!strcasecmp(ext, "S4") || !strcasecmp(ext, "A"))
+		return make_output_path(path, name, "SA");
 	return string_concat_cstring(path, name);
 }
 

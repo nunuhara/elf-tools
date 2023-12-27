@@ -17,8 +17,8 @@
 #include <string.h>
 
 #include "nulib.h"
+#include "ai5/anim.h"
 #include "ai5/cg.h"
-#include "ai5/s4.h"
 
 #define MSF_GIF_IMPL
 #include "msf_gif.h"
@@ -34,7 +34,7 @@ struct stream_state {
 	unsigned loop2_count;
 };
 
-static void fill_clip(struct s4_target *dst, struct s4_size *dim, struct cg_metrics *s_dst)
+static void fill_clip(struct anim_target *dst, struct anim_size *dim, struct cg_metrics *s_dst)
 {
 	if (unlikely(dst->x < 0)) {
 		dim->w += dst->x;
@@ -52,7 +52,7 @@ static void fill_clip(struct s4_target *dst, struct s4_size *dim, struct cg_metr
 	}
 }
 
-static void copy_clip(struct s4_target *src, struct s4_target *dst, struct s4_size *dim,
+static void copy_clip(struct anim_target *src, struct anim_target *dst, struct anim_size *dim,
 		struct cg_metrics *s_src, struct cg_metrics *s_dst)
 {
 	// XXX: apply offset from CG
@@ -97,20 +97,20 @@ static void copy_clip(struct s4_target *src, struct s4_target *dst, struct s4_si
 	}
 }
 
-static void draw_call_clip(struct s4_draw_call *call, struct cg *src, struct cg *dst)
+static void draw_call_clip(struct anim_draw_call *call, struct cg *src, struct cg *dst)
 {
 #define TARGET(t) ((t.i) ? &src->metrics : &dst->metrics)
 	switch (call->op) {
-	case S4_DRAW_OP_FILL:
+	case ANIM_DRAW_OP_FILL:
 		fill_clip(&call->fill.dst, &call->fill.dim, TARGET(call->fill.dst));
 		break;
-	case S4_DRAW_OP_COPY:
-	case S4_DRAW_OP_COPY_MASKED:
-	case S4_DRAW_OP_SWAP:
+	case ANIM_DRAW_OP_COPY:
+	case ANIM_DRAW_OP_COPY_MASKED:
+	case ANIM_DRAW_OP_SWAP:
 		copy_clip(&call->copy.src, &call->copy.dst, &call->copy.dim,
 				TARGET(call->copy.src), TARGET(call->copy.dst));
 		break;
-	case S4_DRAW_OP_COMPOSE:
+	case ANIM_DRAW_OP_COMPOSE:
 		// FIXME: this is not quite correct, but it shouldn't matter since
 		//        clipping is an error condition anyways
 		copy_clip(&call->compose.bg, &call->compose.dst, &call->compose.dim,
@@ -118,8 +118,8 @@ static void draw_call_clip(struct s4_draw_call *call, struct cg *src, struct cg 
 		copy_clip(&call->compose.fg, &call->compose.dst, &call->compose.dim,
 				TARGET(call->compose.fg), TARGET(call->compose.dst));
 		break;
-	case S4_DRAW_OP_SET_COLOR:
-	case S4_DRAW_OP_SET_PALETTE:
+	case ANIM_DRAW_OP_SET_COLOR:
+	case ANIM_DRAW_OP_SET_PALETTE:
 		break;
 	}
 #undef TARGET
@@ -130,7 +130,12 @@ static uint8_t *px_offset(struct cg *cg, unsigned x, unsigned y)
 	return cg->pixels + y * cg->metrics.w + x;
 }
 
-static void stream_render_fill(struct s4_fill_args *call, struct cg *dst)
+static uint8_t *px_offset32(struct cg *cg, unsigned x, unsigned y)
+{
+	return cg->pixels + y * cg->metrics.w * 4 + x * 4;
+}
+
+static void stream_render_indexed_fill(struct anim_fill_args *call, struct cg *dst)
 {
 	if (call->dim.w < 1 || call->dim.h < 1)
 		return;
@@ -140,7 +145,8 @@ static void stream_render_fill(struct s4_fill_args *call, struct cg *dst)
 	}
 }
 
-static void stream_render_copy(struct s4_copy_args *call, struct cg *src, struct cg *dst)
+static void stream_render_indexed_copy(struct anim_copy_args *call, struct cg *src,
+		struct cg *dst)
 {
 	if (call->dim.w < 1 || call->dim.h < 1)
 		return;
@@ -151,7 +157,19 @@ static void stream_render_copy(struct s4_copy_args *call, struct cg *src, struct
 	}
 }
 
-static void stream_render_copy_masked(struct s4_copy_args *call, struct cg *src,
+static void stream_render_direct_copy(struct anim_copy_args *call, struct cg *src,
+		struct cg *dst)
+{
+	if (call->dim.w < 0 || call->dim.h < 1)
+		return;
+	for (int row = 0; row < call->dim.h; row++) {
+		uint8_t *src_p = px_offset32(src, call->src.x, call->src.y + row);
+		uint8_t *dst_p = px_offset32(dst, call->dst.x, call->dst.y + row);
+		memcpy(dst_p, src_p, call->dim.w * 4);
+	}
+}
+
+static void stream_render_indexed_copy_masked(struct anim_copy_args *call, struct cg *src,
 		struct cg *dst)
 {
 	if (call->dim.w < 1 || call->dim.h < 1)
@@ -164,11 +182,29 @@ static void stream_render_copy_masked(struct s4_copy_args *call, struct cg *src,
 			if (*src_p != 8)
 				*dst_p = *src_p;
 		}
-		memcpy(dst_p, src_p, call->dim.w);
+		//memcpy(dst_p, src_p, call->dim.w);
 	}
 }
 
-static void stream_render_swap(struct s4_copy_args *call, struct cg *src, struct cg *dst)
+static void stream_render_direct_copy_masked(struct anim_copy_args *call, struct cg *src,
+		struct cg *dst)
+{
+	if (call->dim.w < 1 || call->dim.h < 1)
+		return;
+	for (int row = 0; row < call->dim.h; row++) {
+		uint8_t *src_p = px_offset32(src, call->src.x, call->src.y + row);
+		uint8_t *dst_p = px_offset32(dst, call->dst.x, call->dst.y + row);
+		for (int col = 0; col < call->dim.w; col++, src_p += 4, dst_p += 4) {
+			// XXX: we assume mask color is 00f800
+			if (src_p[0] == 0 && src_p[1] == 0xf8 && src_p[2] == 0)
+				continue;
+			memcpy(dst_p, src_p, 4);
+		}
+	}
+}
+
+static void stream_render_indexed_swap(struct anim_copy_args *call, struct cg *src,
+		struct cg *dst)
 {
 	if (call->dim.w < 1 || call->dim.h < 1)
 		return;
@@ -183,8 +219,25 @@ static void stream_render_swap(struct s4_copy_args *call, struct cg *src, struct
 	}
 }
 
-static void stream_render_compose(struct s4_compose_args *call, struct cg *fg, struct cg *bg,
+static void stream_render_direct_swap(struct anim_copy_args *call, struct cg *src,
 		struct cg *dst)
+{
+	if (call->dim.w < 1 || call->dim.h < 1)
+		return;
+	for (int row = 0; row < call->dim.h; row++) {
+		uint8_t *src_p = px_offset32(src, call->src.x, call->src.y + row);
+		uint8_t *dst_p = px_offset32(dst, call->dst.x, call->dst.y + row);
+		for (int col = 0; col < call->dim.w; col++, src_p += 4, dst_p += 4) {
+			uint8_t tmp[4];
+			memcpy(tmp, dst_p, 4);
+			memcpy(dst_p, src_p, 4);
+			memcpy(src_p, tmp, 4);
+		}
+	}
+}
+
+static void stream_render_indexed_compose(struct anim_compose_args *call, struct cg *fg,
+		struct cg *bg, struct cg *dst)
 {
 	if (call->dim.w < 1 || call->dim.h < 1)
 		return;
@@ -192,14 +245,34 @@ static void stream_render_compose(struct s4_compose_args *call, struct cg *fg, s
 		uint8_t *fg_p = px_offset(fg, call->fg.x, call->fg.y + row);
 		uint8_t *bg_p = px_offset(bg, call->bg.x, call->bg.y + row);
 		uint8_t *dst_p = px_offset(dst, call->dst.x, call->dst.y + row);
-		for (int col = 0; col < call->dim.w; call++, fg_p++, bg_p++, dst_p++) {
+		for (int col = 0; col < call->dim.w; col++, fg_p++, bg_p++, dst_p++) {
 			// XXX: we assume mask color is 8
 			*dst_p = *fg_p == 8 ? *bg_p : *fg_p;
 		}
 	}
 }
 
-static void stream_render_set_color(struct s4_set_color_args *call, struct cg *src,
+static void stream_render_direct_compose(struct anim_compose_args *call, struct cg *fg,
+		struct cg *bg, struct cg *dst)
+{
+	if (call->dim.w < 1 || call->dim.h < 1)
+		return;
+	for (int row = 0; row < call->dim.h; row++) {
+		uint8_t *fg_p = px_offset32(fg, call->fg.x, call->fg.y + row);
+		uint8_t *bg_p = px_offset32(bg, call->bg.x, call->bg.y + row);
+		uint8_t *dst_p = px_offset32(dst, call->dst.x, call->dst.y + row);
+		for (int col = 0; col < call->dim.w; col++, fg_p += 4, bg_p += 4, dst_p += 4) {
+			// XXX: we assume mask color is 00f800
+			if (fg_p[0] == 0 && fg_p[1] == 0xf8 && fg_p[2] == 0) {
+				memcpy(dst_p, bg_p, 4);
+			} else {
+				memcpy(dst_p, fg_p, 4);
+			}
+		}
+	}
+}
+
+static void stream_render_indexed_set_color(struct anim_set_color_args *call, struct cg *src,
 		struct cg *dst)
 {
 	uint8_t *src_c = src->palette + call->i * 4;
@@ -210,8 +283,8 @@ static void stream_render_set_color(struct s4_set_color_args *call, struct cg *s
 	src_c[3] = dst_c[3] = 0;
 }
 
-static void stream_render_set_palette(struct s4_set_palette_args *call, struct cg *src,
-		struct cg *dst)
+static void stream_render_indexed_set_palette(struct anim_set_palette_args *call,
+		struct cg *src, struct cg *dst)
 {
 	uint8_t *src_c = src->palette;
 	uint8_t *dst_c = dst->palette;
@@ -223,40 +296,71 @@ static void stream_render_set_palette(struct s4_set_palette_args *call, struct c
 	}
 }
 
-static void stream_render_draw(struct s4_draw_call *call, struct cg *src, struct cg *dst)
+static void stream_render_draw_direct(struct anim_draw_call *call, struct cg *src,
+		struct cg *dst)
 {
 #define TARGET(t) ((t).i ? src : dst)
 	switch (call->op) {
-	case S4_DRAW_OP_FILL:
-		stream_render_fill(&call->fill, TARGET(call->fill.dst));
-		break;
-	case S4_DRAW_OP_COPY:
-		stream_render_copy(&call->copy, TARGET(call->copy.src),
+	case ANIM_DRAW_OP_COPY:
+		stream_render_direct_copy(&call->copy, TARGET(call->copy.src),
 				TARGET(call->copy.dst));
 		break;
-	case S4_DRAW_OP_COPY_MASKED:
-		stream_render_copy_masked(&call->copy, TARGET(call->copy.src),
+	case ANIM_DRAW_OP_COPY_MASKED:
+		stream_render_direct_copy_masked(&call->copy, TARGET(call->copy.src),
 				TARGET(call->copy.dst));
 		break;
-	case S4_DRAW_OP_SWAP:
-		stream_render_swap(&call->copy, TARGET(call->copy.src),
+	case ANIM_DRAW_OP_SWAP:
+		stream_render_direct_swap(&call->copy, TARGET(call->copy.src),
 				TARGET(call->copy.dst));
 		break;
-	case S4_DRAW_OP_COMPOSE:
-		stream_render_compose(&call->compose, TARGET(call->compose.fg),
+	case ANIM_DRAW_OP_COMPOSE:
+		stream_render_direct_compose(&call->compose, TARGET(call->compose.fg),
 				TARGET(call->compose.bg), TARGET(call->compose.dst));
 		break;
-	case S4_DRAW_OP_SET_COLOR:
-		stream_render_set_color(&call->set_color, src, dst);
+	default:
+		ERROR("Invalid draw call");
+	}
+#undef TARGET
+}
+
+static void stream_render_draw(struct anim_draw_call *call, struct cg *src, struct cg *dst)
+{
+	if (!src->palette) {
+		stream_render_draw_direct(call, src, dst);
+		return;
+	}
+#define TARGET(t) ((t).i ? src : dst)
+	switch (call->op) {
+	case ANIM_DRAW_OP_FILL:
+		stream_render_indexed_fill(&call->fill, TARGET(call->fill.dst));
 		break;
-	case S4_DRAW_OP_SET_PALETTE:
-		stream_render_set_palette(&call->set_palette, src, dst);
+	case ANIM_DRAW_OP_COPY:
+		stream_render_indexed_copy(&call->copy, TARGET(call->copy.src),
+				TARGET(call->copy.dst));
+		break;
+	case ANIM_DRAW_OP_COPY_MASKED:
+		stream_render_indexed_copy_masked(&call->copy, TARGET(call->copy.src),
+				TARGET(call->copy.dst));
+		break;
+	case ANIM_DRAW_OP_SWAP:
+		stream_render_indexed_swap(&call->copy, TARGET(call->copy.src),
+				TARGET(call->copy.dst));
+		break;
+	case ANIM_DRAW_OP_COMPOSE:
+		stream_render_indexed_compose(&call->compose, TARGET(call->compose.fg),
+				TARGET(call->compose.bg), TARGET(call->compose.dst));
+		break;
+	case ANIM_DRAW_OP_SET_COLOR:
+		stream_render_indexed_set_color(&call->set_color, src, dst);
+		break;
+	case ANIM_DRAW_OP_SET_PALETTE:
+		stream_render_indexed_set_palette(&call->set_palette, src, dst);
 		break;
 	}
 #undef TARGET
 }
 
-static bool stream_render(struct s4 *anim, unsigned stream, struct stream_state *state,
+static bool stream_render(struct anim *anim, unsigned stream, struct stream_state *state,
 		struct cg *src, struct cg *dst)
 {
 	if (state->stalling) {
@@ -268,47 +372,47 @@ static bool stream_render(struct s4 *anim, unsigned stream, struct stream_state 
 		return true;
 	}
 
-	struct s4_instruction instr = vector_A(anim->streams[stream], state->ip);
+	struct anim_instruction instr = vector_A(anim->streams[stream], state->ip);
 	switch (instr.op) {
-	case S4_OP_DRAW:
+	case ANIM_OP_DRAW:
 		stream_render_draw(&vector_A(anim->draw_calls, instr.arg), src, dst);
 		state->ip++;
 		state->dirty = true;
 		return false;
-	case S4_OP_NOOP:
-	case S4_OP_CHECK_STOP:
+	case ANIM_OP_NOOP:
+	case ANIM_OP_CHECK_STOP:
 		state->ip++;
 		break;
-	case S4_OP_STALL:
+	case ANIM_OP_STALL:
 		state->stalling = instr.arg;
 		state->ip++;
 		break;
-	case S4_OP_RESET:
+	case ANIM_OP_RESET:
 		// XXX: no point looping for offline render
 		state->halted = true;
 		//state->ip = 0;
 		break;
-	case S4_OP_HALT:
+	case ANIM_OP_HALT:
 		state->halted = true;
 		break;
-	case S4_OP_LOOP_START:
+	case ANIM_OP_LOOP_START:
 		state->loop_start = state->ip + 1;
 		state->loop_count = instr.arg;
 		state->ip++;
 		break;
-	case S4_OP_LOOP_END:
+	case ANIM_OP_LOOP_END:
 		if (state->loop_count && --state->loop_count) {
 			state->ip = state->loop_start;
 		} else {
 			state->ip++;
 		}
 		break;
-	case S4_OP_LOOP2_START:
+	case ANIM_OP_LOOP2_START:
 		state->loop2_start = state->ip + 1;
 		state->loop2_count = instr.arg;
 		state->ip++;
 		break;
-	case S4_OP_LOOP2_END:
+	case ANIM_OP_LOOP2_END:
 		if (state->loop2_count && --state->loop2_count) {
 			state->ip = state->loop2_start;
 		} else {
@@ -324,26 +428,36 @@ static struct cg *make_blank_cg(struct cg *src)
 	struct cg *dst = xcalloc(1, sizeof(struct cg));
 	dst->metrics.x = 0;
 	dst->metrics.y = 0;
-	dst->metrics.w = 640;
-	dst->metrics.h = 400;
-	dst->pixels = xcalloc(1, 640 * 400);
-	dst->palette = xmalloc(256 * 4);
-	memcpy(dst->palette, src->palette, 256 * 4);
+	if (src->palette) {
+		dst->metrics.w = 640;
+		dst->metrics.h = 400;
+		dst->pixels = xcalloc(640 * 400, 1);
+		dst->palette = xmalloc(256 * 4);
+		memcpy(dst->palette, src->palette, 256 * 4);
+	} else {
+		dst->metrics.w = 640;
+		dst->metrics.h = 480;
+		dst->pixels = xcalloc(640 * 480, 4);
+	}
 	return dst;
 }
 
-struct s4_frame {
+struct anim_frame {
 	struct cg *cg;
 	unsigned nr_frames;
 };
 
-struct s4_frame *s4_render_frames(struct s4 *anim, struct cg *src, struct cg *dst,
+struct anim_frame *anim_render_frames(struct anim *anim, struct cg *src, struct cg *dst,
 		unsigned max_frames)
 {
 	bool dst_needs_free = false;
 
-	if (!src->palette || (dst && !dst->palette)) {
-		WARNING("Only indexed CGs are supported for S4 animations");
+	if (src->palette && (dst && !dst->palette)) {
+		WARNING("source and destination CGs have different bit depth");
+		return NULL;
+	}
+	if (!src->palette && (dst && dst->palette)) {
+		WARNING("source and destination CGs have different bit depth");
 		return NULL;
 	}
 
@@ -354,25 +468,25 @@ struct s4_frame *s4_render_frames(struct s4 *anim, struct cg *src, struct cg *ds
 	}
 
 	// ensure all draw operations are clipped to src/dst size
-	struct s4_draw_call *call;
+	struct anim_draw_call *call;
 	vector_foreach_p(call, anim->draw_calls) {
 		draw_call_clip(call, src, dst);
 	}
 
 	// halt all empty streams
-	struct stream_state state[S4_MAX_STREAMS] = {0};
-	for (int i = 0; i < S4_MAX_STREAMS; i++) {
+	struct stream_state state[ANIM_MAX_STREAMS] = {0};
+	for (int i = 0; i < ANIM_MAX_STREAMS; i++) {
 		if (vector_length(anim->streams[i]) == 0)
 			state[i].halted = true;
 	}
 
-	struct s4_frame *frames = xcalloc(max_frames, sizeof(struct s4_frame));
-	frames[0].cg = cg_depalettize_copy(dst);
+	struct anim_frame *frames = xcalloc(max_frames, sizeof(struct anim_frame));
+	frames[0].cg = dst->palette ? cg_depalettize_copy(dst) : cg_copy(dst);
 
 	for (unsigned frame = 0; frame < max_frames;) {
 		bool halted = true;
 		bool flush = false;
-		for (int stream = 0; stream < S4_MAX_STREAMS; stream++) {
+		for (int stream = 0; stream < ANIM_MAX_STREAMS; stream++) {
 			if (!state[stream].halted) {
 				halted = false;
 				if (stream_render(anim, stream, &state[stream], src, dst)
@@ -388,7 +502,7 @@ struct s4_frame *s4_render_frames(struct s4 *anim, struct cg *src, struct cg *ds
 			frame++;
 			if (frame >= max_frames)
 				break;
-			frames[frame].cg = cg_depalettize_copy(dst);
+			frames[frame].cg = dst->palette ? cg_depalettize_copy(dst) : cg_copy(dst);
 			frames[frame].nr_frames = 1;
 		} else {
 			frames[frame].nr_frames++;
@@ -401,10 +515,10 @@ struct s4_frame *s4_render_frames(struct s4 *anim, struct cg *src, struct cg *ds
 	return frames;
 }
 
-uint8_t *s4_render_gif(struct s4 *anim, struct cg *src, struct cg *dst,
+uint8_t *anim_render_gif(struct anim *anim, struct cg *src, struct cg *dst,
 		unsigned max_frames, size_t *size_out)
 {
-	struct s4_frame *frames = s4_render_frames(anim, src, dst, max_frames);
+	struct anim_frame *frames = anim_render_frames(anim, src, dst, max_frames);
 	if (!frames)
 		return NULL;
 

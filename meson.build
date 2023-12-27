@@ -20,8 +20,8 @@ bisongen = generator(bison,
 incdirs = include_directories('include')
 
 sources = [
-  'src/core/anim/s4_pack.c',
-  'src/core/anim/s4_render.c',
+  'src/core/anim/pack.c',
+  'src/core/anim/render.c',
   'src/core/mes/ctor.c',
   'src/core/mes/decompile.c',
   'src/core/mes/flat_parser.c',
@@ -51,8 +51,8 @@ sources += bisongen.process('src/core/mes/flat_parser.y')
 sources += flexgen.process('src/core/arc/manifest_lexer.l')
 sources += bisongen.process('src/core/arc/manifest_parser.y')
 
-sources += flexgen.process('src/core/anim/s4_lexer.l')
-sources += bisongen.process('src/core/anim/s4_parser.y')
+sources += flexgen.process('src/core/anim/anim_lexer.l')
+sources += bisongen.process('src/core/anim/anim_parser.y')
 
 executable('elf', sources,
   dependencies : [libai5_dep, png],

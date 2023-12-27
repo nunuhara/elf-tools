@@ -19,10 +19,10 @@
 
 #include "nulib.h"
 #include "nulib/file.h"
+#include "ai5/anim.h"
 #include "ai5/cg.h"
-#include "ai5/s4.h"
 
-struct s4 *file_s4_load(const char *path)
+struct anim *file_anim_load(const char *path)
 {
 	// read file
 	size_t data_size;
@@ -31,12 +31,12 @@ struct s4 *file_s4_load(const char *path)
 		sys_error("Error reading file \"%s\": %s\n", path, strerror(errno));
 
 	// deserialize
-	struct s4 *s4 = s4_parse(data, data_size);
-	if (!s4)
-		sys_error("Failed to parse S4 file \"%s\"\n", path);
+	struct anim *anim = anim_parse(data, data_size);
+	if (!anim)
+		sys_error("Failed to parse animation file \"%s\"\n", path);
 
 	free(data);
-	return s4;
+	return anim;
 }
 
 struct cg *file_cg_load(const char *path)
