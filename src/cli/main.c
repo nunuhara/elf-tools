@@ -76,6 +76,18 @@ struct command cmd_cg = {
 	}
 };
 
+struct command cmd_font = {
+	.name = "font",
+	.usage = "<command> ...",
+	.description = "Tools for extracting and editing fonts",
+	.parent = &cmd_elf,
+	.commands = {
+		&cmd_font_extract,
+		//&cmd_font_pack,
+		NULL
+	}
+};
+
 struct command cmd_lzss = {
 	.name = "lzss",
 	.usage = "<command> ...",
@@ -110,6 +122,7 @@ struct command cmd_elf = {
 		&cmd_anim,
 		&cmd_arc,
 		&cmd_cg,
+		&cmd_font,
 		&cmd_lzss,
 		&cmd_mes,
 		NULL
