@@ -181,8 +181,7 @@ bool arc_write(const char *path, arc_file_list files, struct arc_metadata *meta)
 static struct arc_file arc_file_fs(string path, string name)
 {
 	// handle conversions
-	const char *ext = file_extension(path);
-	if (!strcasecmp(ext, "mes")) {
+	if (archive_file_compressed(path)) {
 		size_t raw_size;
 		uint8_t *raw_data = file_read(path, &raw_size);
 		if (!raw_data)
@@ -336,6 +335,12 @@ static struct arc_metadata game_keys[] = {
 		.size_key    = 0xaa55aa55,
 		.name_key    = 0x55,
 	},
+	[GAME_ALLSTARS] = {
+		.name_length = 20,
+		.offset_key  = 0x44bd44bd,
+		.size_key    = 0xcf88cf88,
+		.name_key    = 0x66,
+	},
 };
 
 static void set_key_by_game(const char *name, struct arc_metadata *meta)
@@ -367,7 +372,9 @@ break;
 		case LOPT_KEY:
 			decode_key(optarg, &meta);
 			break;
+		case 'g':
 		case LOPT_GAME:
+			ai5_set_game(optarg);
 			set_key_by_game(optarg, &meta);
 			break;
 		}
@@ -404,6 +411,7 @@ struct command cmd_arc_pack = {
 	.fun = cli_arc_pack,
 	.options = {
 		{ "key", 0, "Specify the index encryption key", required_argument, LOPT_KEY },
+		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
 		{ 0 }
 	}
 };
