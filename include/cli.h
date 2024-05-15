@@ -19,6 +19,9 @@
 
 #include "nulib/command.h"
 
+#define CLI_ERROR(fmt, ...) sys_error(fmt "\n", ##__VA_ARGS__)
+#define CLI_WARNING(fmt, ...) sys_warning("*WARNING*: " fmt "\n", ##__VA_ARGS__)
+
 extern struct command cmd_elf;
 extern struct command cmd_a6;
 extern struct command cmd_a6_compile;
