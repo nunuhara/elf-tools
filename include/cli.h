@@ -48,6 +48,8 @@ extern struct command cmd_lzss_decompress;
 extern struct command cmd_mes;
 extern struct command cmd_mes_compile;
 extern struct command cmd_mes_decompile;
+extern struct command cmd_mpx;
+extern struct command cmd_mpx_unpack;
 
 enum game_id parse_game_id(const char *str);
 

@@ -136,6 +136,18 @@ struct command cmd_mes = {
 	}
 };
 
+struct command cmd_mpx = {
+	.name = "mpx",
+	.usage = "<command> ...",
+	.description = "Tools for packing and unpacking .mpx files",
+	.parent = &cmd_elf,
+	.commands = {
+		//&cmd_mpx_pack,
+		&cmd_mpx_unpack,
+		NULL
+	}
+};
+
 struct command cmd_elf = {
 	.name = "elf",
 	.usage = "<command> ...",
@@ -151,6 +163,7 @@ struct command cmd_elf = {
 		&cmd_font,
 		&cmd_lzss,
 		&cmd_mes,
+		&cmd_mpx,
 		NULL
 	}
 };

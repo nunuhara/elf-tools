@@ -59,6 +59,7 @@ The currently implemented commands are:
     elf cg   convert   - Convert an image file to another format
     elf mes  compile   - Compile a .mes file
     elf mes  decompile - Decompile a .mes file
+    elf mpx  unpack    - Unpack a .mpx file
 
 ### How-To
 
