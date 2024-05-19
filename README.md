@@ -54,6 +54,7 @@ The currently implemented commands are:
     elf arc  extract   - Extract an archive file
     elf arc  list      - List the contents of an archive file
     elf arc  pack      - Create/modify an archive file
+    elf ccd  unpack    - Unpack a .ccd file
     elf cg   convert   - Convert an image file to another format
     elf mes  compile   - Compile a .mes file
     elf mes  decompile - Decompile a .mes file

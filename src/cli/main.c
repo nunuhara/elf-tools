@@ -65,6 +65,18 @@ struct command cmd_arc = {
 	}
 };
 
+struct command cmd_ccd = {
+	.name = "ccd",
+	.usage = "<command> ...",
+	.description = "Tools for packing and unpacking .CCD files",
+	.parent = &cmd_elf,
+	.commands = {
+		//&cmd_ccd_pack,
+		&cmd_ccd_unpack,
+		NULL
+	}
+};
+
 struct command cmd_cg = {
 	.name = "cg",
 	.usage = "<command> ...",
@@ -121,6 +133,7 @@ struct command cmd_elf = {
 		&cmd_a6,
 		&cmd_anim,
 		&cmd_arc,
+		&cmd_ccd,
 		&cmd_cg,
 		&cmd_font,
 		&cmd_lzss,

@@ -34,6 +34,8 @@ extern struct command cmd_arc;
 extern struct command cmd_arc_extract;
 extern struct command cmd_arc_list;
 extern struct command cmd_arc_pack;
+extern struct command cmd_ccd;
+extern struct command cmd_ccd_unpack;
 extern struct command cmd_cg;
 extern struct command cmd_cg_convert;
 extern struct command cmd_font;
