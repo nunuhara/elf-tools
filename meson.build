@@ -39,6 +39,7 @@ sources = [
   'src/cli/arc_pack.c',
   'src/cli/ccd_unpack.c',
   'src/cli/cg_convert.c',
+  'src/cli/eve_unpack.c',
   'src/cli/font_extract.c',
   'src/cli/lzss_compress.c',
   'src/cli/lzss_decompress.c',

@@ -38,6 +38,8 @@ extern struct command cmd_ccd;
 extern struct command cmd_ccd_unpack;
 extern struct command cmd_cg;
 extern struct command cmd_cg_convert;
+extern struct command cmd_eve;
+extern struct command cmd_eve_unpack;
 extern struct command cmd_font;
 extern struct command cmd_font_extract;
 extern struct command cmd_lzss;

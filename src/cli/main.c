@@ -68,7 +68,7 @@ struct command cmd_arc = {
 struct command cmd_ccd = {
 	.name = "ccd",
 	.usage = "<command> ...",
-	.description = "Tools for packing and unpacking .CCD files",
+	.description = "Tools for packing and unpacking .ccd files",
 	.parent = &cmd_elf,
 	.commands = {
 		//&cmd_ccd_pack,
@@ -84,6 +84,18 @@ struct command cmd_cg = {
 	.parent = &cmd_elf,
 	.commands = {
 		&cmd_cg_convert,
+		NULL
+	}
+};
+
+struct command cmd_eve = {
+	.name = "eve",
+	.usage = "<command> ...",
+	.description = "Tools for packing and unpacking .eve files",
+	.parent = &cmd_elf,
+	.commands = {
+		//&cmd_eve_pack,
+		&cmd_eve_unpack,
 		NULL
 	}
 };
@@ -135,6 +147,7 @@ struct command cmd_elf = {
 		&cmd_arc,
 		&cmd_ccd,
 		&cmd_cg,
+		&cmd_eve,
 		&cmd_font,
 		&cmd_lzss,
 		&cmd_mes,
