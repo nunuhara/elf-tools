@@ -46,7 +46,8 @@ sources = [
   'src/cli/main.c',
   'src/cli/mes_compile.c',
   'src/cli/mes_decompile.c',
-  'src/cli/mpx_unpack.c'
+  'src/cli/mpx_unpack.c',
+  'src/cli/save.c',
 ]
 
 sources += flexgen.process('src/core/mes/flat_lexer.l')

@@ -60,6 +60,8 @@ The currently implemented commands are:
     elf mes  compile   - Compile a .mes file
     elf mes  decompile - Decompile a .mes file
     elf mpx  unpack    - Unpack a .mpx file
+    elf save get-flag  - Get the value of a flag from a save file
+    elf save info      - Get game-specific info about a save file
 
 ### How-To
 

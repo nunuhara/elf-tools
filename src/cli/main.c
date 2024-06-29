@@ -164,6 +164,7 @@ struct command cmd_elf = {
 		&cmd_lzss,
 		&cmd_mes,
 		&cmd_mpx,
+		&cmd_save,
 		NULL
 	}
 };
