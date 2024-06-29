@@ -16,8 +16,13 @@
 
 #include "nulib.h"
 #include "ai5/arc.h"
+#include "ai5/game.h"
 
 #include "cli.h"
+
+enum {
+	LOPT_GAME = 256,
+};
 
 int arc_list(int argc, char *argv[])
 {
@@ -25,6 +30,12 @@ int arc_list(int argc, char *argv[])
 		int c = command_getopt(argc, argv, &cmd_arc_list);
 		if (c == -1)
 			break;
+		switch (c) {
+		case 'g':
+		case LOPT_GAME:
+			ai5_set_game(optarg);
+			break;
+		}
 	}
 	argc -= optind;
 	argv += optind;
@@ -51,6 +62,7 @@ struct command cmd_arc_list = {
 	.parent = &cmd_arc,
 	.fun = arc_list,
 	.options = {
+		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
 		{ 0 }
 	}
 };

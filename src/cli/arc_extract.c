@@ -254,6 +254,7 @@ enum {
 	LOPT_MES_TEXT,
 	LOPT_MES_NAME,
 	LOPT_KEY,
+	LOPT_STEREO,
 };
 
 int arc_extract(int argc, char *argv[])
@@ -261,6 +262,7 @@ int arc_extract(int argc, char *argv[])
 	const char *output_file = NULL;
 	const char *name = NULL;
 	bool key = false;
+	unsigned flags = 0;
 	while (1) {
 		int c = command_getopt(argc, argv, &cmd_arc_extract);
 		if (c == -1)
@@ -293,6 +295,9 @@ int arc_extract(int argc, char *argv[])
 		case LOPT_KEY:
 			key = true;
 			break;
+		case LOPT_STEREO:
+			flags |= ARCHIVE_STEREO;
+			break;
 		}
 	}
 	argc -= optind;
@@ -301,7 +306,7 @@ int arc_extract(int argc, char *argv[])
 	if (argc != 1)
 		command_usage_error(&cmd_arc_extract, "Wrong number of arguments.\n");
 
-	struct archive *arc = archive_open(argv[0], 0);
+	struct archive *arc = archive_open(argv[0], flags);
 	if (!arc)
 		sys_error("Failed to open archive file \"%s\".\n", argv[0]);
 
@@ -333,6 +338,7 @@ struct command cmd_arc_extract = {
 		{ "mes-text", 0, "Output text for mes files", no_argument, LOPT_MES_TEXT },
 		{ "mes-name-function", 0, "Specify the name function number for mes files", no_argument, LOPT_MES_NAME },
 		{ "key", 0, "Print the index encryption key (do not extract)", no_argument, LOPT_KEY },
+		{ "stereo", 0, "Raw PCM data is stereo (AWD/AWF archives)", no_argument, LOPT_STEREO },
 		{ 0 }
 	}
 };
