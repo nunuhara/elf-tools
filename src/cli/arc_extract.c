@@ -261,6 +261,7 @@ enum {
 	LOPT_GAME,
 	LOPT_NAME,
 	LOPT_RAW,
+	LOPT_NO_DECOMPRESS,
 	LOPT_MES_FLAT,
 	LOPT_MES_TEXT,
 	LOPT_MES_NAME,
@@ -293,6 +294,10 @@ int arc_extract(int argc, char *argv[])
 			break;
 		case LOPT_RAW:
 			raw = true;
+			break;
+		case LOPT_NO_DECOMPRESS:
+			raw = true;
+			flags |= ARCHIVE_RAW;
 			break;
 		case LOPT_MES_FLAT:
 			mes_flat = true;
@@ -345,6 +350,7 @@ struct command cmd_arc_extract = {
 		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
 		{ "name", 'n', "Specify the file to extract", required_argument, LOPT_NAME },
 		{ "raw", 0, "Do not convert (keep original file type)", no_argument, LOPT_RAW },
+		{ "no-decompress", 0, "Do not decompress files", no_argument, LOPT_NO_DECOMPRESS },
 		{ "mes-flat", 0, "Output flat mes files", no_argument, LOPT_MES_FLAT },
 		{ "mes-text", 0, "Output text for mes files", no_argument, LOPT_MES_TEXT },
 		{ "mes-name-function", 0, "Specify the name function number for mes files", no_argument, LOPT_MES_NAME },
