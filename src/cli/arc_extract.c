@@ -147,6 +147,18 @@ static bool extract_anim(struct archive_data *data, const char *output_file)
 	return true;
 }
 
+static bool ext_is_cg(const char *ext)
+{
+	static const char * const cg_ext[] = {
+		"GP8", "G16", "G24", "G32", "GCC"
+	};
+	for (unsigned i = 0; i < ARRAY_SIZE(cg_ext); i++) {
+		if (!strcasecmp(ext, cg_ext[i]))
+			return true;
+	}
+	return false;
+}
+
 static bool extract_file(struct archive_data *data, const char *output_file)
 {
 	if (raw)
@@ -155,8 +167,7 @@ static bool extract_file(struct archive_data *data, const char *output_file)
 	const char *ext = file_extension(data->name);
 	if (!strcasecmp(ext, "MES"))
 		return extract_mes(data, output_file);
-	if (!strcasecmp(ext, "GP8") || !strcasecmp(ext, "G16") || !strcasecmp(ext, "G24")
-			|| !strcasecmp(ext, "G32"))
+	if (ext_is_cg(ext))
 		return extract_cg(data, output_file);
 	if (!strcasecmp(ext, "S4") || !strcasecmp(ext, "A"))
 		return extract_anim(data, output_file);
