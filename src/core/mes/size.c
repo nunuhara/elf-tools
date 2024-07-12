@@ -26,15 +26,15 @@ static uint32_t _expression_size(struct mes_expression *expr)
 {
 	uint32_t len = 1;
 	switch (expr->op) {
-	case MES_EXPR_VAR:
-	case MES_EXPR_VAR32:
+	case MES_EXPR_GET_VAR16:
+	case MES_EXPR_GET_VAR32:
 		len++;
 		break;
-	case MES_EXPR_ARRAY16_GET16:
-	case MES_EXPR_ARRAY16_GET8:
-	case MES_EXPR_ARRAY32_GET32:
-	case MES_EXPR_ARRAY32_GET16:
-	case MES_EXPR_ARRAY32_GET8:
+	case MES_EXPR_PTR16_GET16:
+	case MES_EXPR_PTR16_GET8:
+	case MES_EXPR_PTR32_GET32:
+	case MES_EXPR_PTR32_GET16:
+	case MES_EXPR_PTR32_GET8:
 		len += 1 + _expression_size(expr->sub_a);
 		break;
 	case MES_EXPR_PLUS:
@@ -63,13 +63,13 @@ static uint32_t _expression_size(struct mes_expression *expr)
 		}
 		break;
 	case MES_EXPR_IMM16:
-	case MES_EXPR_REG16:
+	case MES_EXPR_GET_FLAG_CONST:
 		len += 2;
 		break;
 	case MES_EXPR_IMM32:
 		len += 4;
 		break;
-	case MES_EXPR_REG8:
+	case MES_EXPR_GET_FLAG_EXPR:
 		len += _expression_size(expr->sub_a);
 		break;
 	case MES_EXPR_END:
@@ -170,10 +170,10 @@ uint32_t mes_statement_size(struct mes_statement *stmt)
 	switch (stmt->op) {
 	case MES_STMT_END:
 		break;
-	case MES_STMT_TXT:
-	case MES_STMT_STR:
+	case MES_STMT_ZENKAKU:
+	case MES_STMT_HANKAKU:
 		// FIXME: doesn't handle escapes properly
-		if (stmt->op == MES_STMT_TXT) {
+		if (stmt->op == MES_STMT_ZENKAKU) {
 			len += txt_size(stmt->TXT.text);
 		} else {
 			len += str_size(stmt->TXT.text);
@@ -183,35 +183,24 @@ uint32_t mes_statement_size(struct mes_statement *stmt)
 		if (stmt->TXT.unprefixed)
 			len--;
 		break;
-	case MES_STMT_SETRBC:
-		len += 2 + expression_list_size(stmt->SETRBC.exprs);
+	case MES_STMT_SET_FLAG_CONST:
+		len += 2 + expression_list_size(stmt->SET_VAR_CONST.val_exprs);
 		break;
-	case MES_STMT_SETV:
-		len += 1 + expression_list_size(stmt->SETV.exprs);
+	case MES_STMT_SET_VAR16:
+	case MES_STMT_SET_VAR32:
+		len += 1 + expression_list_size(stmt->SET_VAR_CONST.val_exprs);
 		break;
-	case MES_STMT_SETRBE:
-		len += expression_size(stmt->SETRBE.reg_expr);
-		len += expression_list_size(stmt->SETRBE.val_exprs);
+	case MES_STMT_SET_FLAG_EXPR:
+		len += expression_size(stmt->SET_VAR_EXPR.var_expr);
+		len += expression_list_size(stmt->SET_VAR_EXPR.val_exprs);
 		break;
-	case MES_STMT_SETAC:
-		len += expression_size(stmt->SETAC.off_expr) + 1;
-		len += expression_list_size(stmt->SETAC.val_exprs);
-		break;
-	case MES_STMT_SETA_AT:
-		len += expression_size(stmt->SETA_AT.off_expr) + 1;
-		len += expression_list_size(stmt->SETA_AT.val_exprs);
-		break;
-	case MES_STMT_SETAD:
-		len += expression_size(stmt->SETAD.off_expr) + 1;
-		len += expression_list_size(stmt->SETAD.val_exprs);
-		break;
-	case MES_STMT_SETAW:
-		len += expression_size(stmt->SETAB.off_expr) + 1;
-		len += expression_list_size(stmt->SETAB.val_exprs);
-		break;
-	case MES_STMT_SETAB:
-		len += expression_size(stmt->SETAB.off_expr) + 1;
-		len += expression_list_size(stmt->SETAB.val_exprs);
+	case MES_STMT_PTR16_SET8:
+	case MES_STMT_PTR16_SET16:
+	case MES_STMT_PTR32_SET8:
+	case MES_STMT_PTR32_SET16:
+	case MES_STMT_PTR32_SET32:
+		len += expression_size(stmt->PTR_SET.off_expr) + 1;
+		len += expression_list_size(stmt->PTR_SET.val_exprs);
 		break;
 	case MES_STMT_JZ:
 		len += expression_size(stmt->JZ.expr) + 4;
@@ -223,31 +212,22 @@ uint32_t mes_statement_size(struct mes_statement *stmt)
 		len += expression_size(stmt->SYS.expr);
 		len += parameter_list_size(stmt->SYS.params);
 		break;
-	case MES_STMT_GOTO:
-		len += parameter_list_size(stmt->GOTO.params);
-		break;
-	case MES_STMT_CALL:
+	case MES_STMT_JMP_MES:
+	case MES_STMT_CALL_MES:
+	case MES_STMT_CALL_PROC:
+	case MES_STMT_UTIL:
 		len += parameter_list_size(stmt->CALL.params);
 		break;
-	case MES_STMT_MENUI:
-		len += parameter_list_size(stmt->MENUI.params) + 4;
-		break;
-	case MES_STMT_PROC:
-		len += parameter_list_size(stmt->PROC.params);
-		break;
-	case MES_STMT_UTIL:
-		len += parameter_list_size(stmt->UTIL.params);
+	case MES_STMT_DEF_MENU:
+		len += parameter_list_size(stmt->DEF_MENU.params) + 4;
 		break;
 	case MES_STMT_LINE:
 		len++;
 		break;
-	case MES_STMT_PROCD:
-		len += expression_size(stmt->PROCD.no_expr) + 4;
+	case MES_STMT_DEF_PROC:
+		len += expression_size(stmt->DEF_PROC.no_expr) + 4;
 		break;
-	case MES_STMT_MENUS:
-		break;
-	case MES_STMT_SETRD:
-		len += 1 + expression_list_size(stmt->SETRD.val_exprs);
+	case MES_STMT_MENU_EXEC:
 		break;
 	default:
 		ERROR("invalid statement type");

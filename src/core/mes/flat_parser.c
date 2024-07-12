@@ -111,11 +111,11 @@ static void mf_resolve_labels(mes_statement_list statements)
 		case MES_STMT_JMP:
 			ref.stmt->JMP.addr = stmt->address;
 			break;
-		case MES_STMT_MENUI:
-			ref.stmt->MENUI.addr = stmt->address;
+		case MES_STMT_DEF_MENU:
+			ref.stmt->DEF_MENU.skip_addr = stmt->address;
 			break;
-		case MES_STMT_PROCD:
-			ref.stmt->PROCD.skip_addr = stmt->address;
+		case MES_STMT_DEF_PROC:
+			ref.stmt->DEF_PROC.skip_addr = stmt->address;
 			break;
 		default:
 			ERROR("invalid opcode for label reference: %d", ref.stmt->op);
@@ -180,7 +180,7 @@ static struct mes_statement *read_string_literal(const char *in, const char **ou
 			i++;
 			p += 2;
 		}
-		struct mes_statement *stmt = mes_stmt(MES_STMT_TXT);
+		struct mes_statement *stmt = mes_stmt(MES_STMT_ZENKAKU);
 		stmt->TXT.text = sjis_cstring_to_utf8(in, i*2);
 		stmt->TXT.terminated = true;
 		*out = p;
@@ -192,7 +192,7 @@ static struct mes_statement *read_string_literal(const char *in, const char **ou
 			i++;
 			p++;
 		}
-		struct mes_statement *stmt = mes_stmt(MES_STMT_STR);
+		struct mes_statement *stmt = mes_stmt(MES_STMT_HANKAKU);
 		stmt->TXT.text = string_new_len(in, i);
 		stmt->TXT.terminated = true;
 		*out = p;
@@ -262,7 +262,7 @@ struct mes_statement *mf_stmt_util(mes_qname name, mes_parameter_list params)
 {
 	mes_parameter_list call = mes_resolve_util(name);
 	struct mes_statement *stmt = mes_stmt(MES_STMT_UTIL);
-	stmt->UTIL.params = append_params(call, params);
+	stmt->CALL.params = append_params(call, params);
 	vector_destroy(params);
 	return stmt;
 }

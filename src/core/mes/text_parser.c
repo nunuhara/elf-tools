@@ -383,8 +383,8 @@ static void push_string(const char *text, size_t len, bool zenkaku,
 
 static void push_call(unsigned fno, mes_statement_list *mes, uint32_t *mes_addr)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_PROC);
-	vector_push(struct mes_parameter, stmt->PROC.params, mes_param_expr(mes_expr_constant(fno)));
+	struct mes_statement *stmt = mes_stmt(MES_STMT_CALL_PROC);
+	vector_push(struct mes_parameter, stmt->CALL.params, mes_param_expr(mes_expr_constant(fno)));
 	push_stmt(stmt, mes, mes_addr);
 }
 
@@ -541,8 +541,8 @@ mes_statement_list mes_substitute_text(mes_statement_list mes, mes_text_sub_list
 		switch (stmt->op) {
 		case MES_STMT_JZ:    addr = &stmt->JZ.addr; break;
 		case MES_STMT_JMP:   addr = &stmt->JMP.addr; break;
-		case MES_STMT_MENUI: addr = &stmt->MENUI.addr; break;
-		case MES_STMT_PROCD: addr = &stmt->PROCD.skip_addr; break;
+		case MES_STMT_DEF_MENU: addr = &stmt->DEF_MENU.skip_addr; break;
+		case MES_STMT_DEF_PROC: addr = &stmt->DEF_PROC.skip_addr; break;
 		default: continue;
 		}
 		// replace old address with new address

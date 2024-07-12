@@ -67,7 +67,7 @@ static struct cg *load_raw_bitmap(const char *bmp_path, const char *pal_path, in
 	if (!bmp)
 		CLI_ERROR("Unable to read BMP file \"%s\": %s", bmp_path, strerror(errno));
 
-	struct cg *cg = xcalloc(1, sizeof(struct cg));
+	struct cg *cg = cg_alloc();
 
 	// try to find palette if not specified
 	if (!pal_path) {
@@ -125,16 +125,9 @@ static struct cg *load_raw_bitmap(const char *bmp_path, const char *pal_path, in
 
 static struct cg *alloc_indexed_cg_with_palette(unsigned w, unsigned h, uint8_t *pal)
 {
-	struct cg *cg = xcalloc(1, sizeof(struct cg));
-	cg->metrics.w = w;
-	cg->metrics.h = h;
-	cg->metrics.bpp = 8;
-	cg->metrics.has_alpha = false;
-	cg->pixels = xcalloc(1, w * h);
-	cg->palette = xcalloc(256, 4);
+	struct cg *cg = cg_alloc_indexed(w, h);
 	memcpy(cg->palette, pal, 256 * 4);
 	return cg;
-
 }
 
 static void write_blank_tile(uint8_t *dst, unsigned stride)

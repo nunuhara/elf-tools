@@ -35,7 +35,7 @@ struct mes_statement *mes_stmt_end(void)
 
 struct mes_statement *mes_stmt_txt(string str)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_TXT);
+	struct mes_statement *stmt = mes_stmt(MES_STMT_ZENKAKU);
 	stmt->TXT.text = str;
 	stmt->TXT.terminated = true;
 	return stmt;
@@ -43,7 +43,7 @@ struct mes_statement *mes_stmt_txt(string str)
 
 struct mes_statement *mes_stmt_str(string str)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_STR);
+	struct mes_statement *stmt = mes_stmt(MES_STMT_HANKAKU);
 	stmt->TXT.text = str;
 	stmt->TXT.terminated = true;
 	return stmt;
@@ -51,17 +51,17 @@ struct mes_statement *mes_stmt_str(string str)
 
 struct mes_statement *mes_stmt_setrbc(uint16_t no, mes_expression_list exprs)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETRBC);
-	stmt->SETRBC.reg_no = no;
-	stmt->SETRBC.exprs = exprs;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_SET_FLAG_CONST);
+	stmt->SET_VAR_CONST.var_no = no;
+	stmt->SET_VAR_CONST.val_exprs = exprs;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_setrbe(struct mes_expression *expr, mes_expression_list exprs)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETRBE);
-	stmt->SETRBE.reg_expr = expr;
-	stmt->SETRBE.val_exprs = exprs;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_SET_FLAG_EXPR);
+	stmt->SET_VAR_EXPR.var_expr = expr;
+	stmt->SET_VAR_EXPR.val_exprs = exprs;
 	return stmt;
 }
 
@@ -82,87 +82,87 @@ struct mes_statement *mes_stmt_setrbx(struct mes_expression *expr, mes_expressio
 
 struct mes_statement *mes_stmt_setv(uint8_t no, mes_expression_list exprs)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETV);
-	stmt->SETV.var_no = no;
-	stmt->SETV.exprs = exprs;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_SET_VAR16);
+	stmt->SET_VAR_CONST.var_no = no;
+	stmt->SET_VAR_CONST.val_exprs = exprs;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_setrd(uint8_t no, mes_expression_list exprs)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETRD);
-	stmt->SETRD.var_no = no;
-	stmt->SETRD.val_exprs = exprs;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_SET_VAR32);
+	stmt->SET_VAR_CONST.var_no = no;
+	stmt->SET_VAR_CONST.val_exprs = exprs;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_setac(uint8_t no, struct mes_expression *off,
 		mes_expression_list vals)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETAC);
-	stmt->SETAC.var_no = no;
-	stmt->SETAC.off_expr = off;
-	stmt->SETAC.val_exprs = vals;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_PTR16_SET8);
+	stmt->PTR_SET.var_no = no;
+	stmt->PTR_SET.off_expr = off;
+	stmt->PTR_SET.val_exprs = vals;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_seta_at(uint8_t no, struct mes_expression *off,
 		mes_expression_list vals)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETA_AT);
-	stmt->SETA_AT.var_no = no;
-	stmt->SETA_AT.off_expr = off;
-	stmt->SETA_AT.val_exprs = vals;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_PTR16_SET16);
+	stmt->PTR_SET.var_no = no;
+	stmt->PTR_SET.off_expr = off;
+	stmt->PTR_SET.val_exprs = vals;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_setad(uint8_t no, struct mes_expression *off,
 		mes_expression_list vals)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETAD);
-	stmt->SETAD.var_no = no;
-	stmt->SETAD.off_expr = off;
-	stmt->SETAD.val_exprs = vals;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_PTR32_SET32);
+	stmt->PTR_SET.var_no = no;
+	stmt->PTR_SET.off_expr = off;
+	stmt->PTR_SET.val_exprs = vals;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_setaw(uint8_t no, struct mes_expression *off,
 		mes_expression_list vals)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETAW);
-	stmt->SETAW.var_no = no;
-	stmt->SETAW.off_expr = off;
-	stmt->SETAW.val_exprs = vals;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_PTR32_SET16);
+	stmt->PTR_SET.var_no = no;
+	stmt->PTR_SET.off_expr = off;
+	stmt->PTR_SET.val_exprs = vals;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_setab(uint8_t no, struct mes_expression *off,
 		mes_expression_list vals)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETAB);
-	stmt->SETAB.var_no = no;
-	stmt->SETAB.off_expr = off;
-	stmt->SETAB.val_exprs = vals;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_PTR32_SET8);
+	stmt->PTR_SET.var_no = no;
+	stmt->PTR_SET.off_expr = off;
+	stmt->PTR_SET.val_exprs = vals;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_sys_var16_set(struct mes_expression *no,
 		mes_expression_list vals)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETA_AT);
-	stmt->SETA_AT.var_no = 0;
-	stmt->SETA_AT.off_expr = no;
-	stmt->SETA_AT.val_exprs = vals;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_PTR16_SET16);
+	stmt->PTR_SET.var_no = 0;
+	stmt->PTR_SET.off_expr = no;
+	stmt->PTR_SET.val_exprs = vals;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_sys_var32_set(struct mes_expression *no,
 		mes_expression_list vals)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_SETAD);
-	stmt->SETAD.var_no = 0;
-	stmt->SETAD.off_expr = no;
-	stmt->SETAD.val_exprs = vals;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_PTR32_SET32);
+	stmt->PTR_SET.var_no = 0;
+	stmt->PTR_SET.off_expr = no;
+	stmt->PTR_SET.val_exprs = vals;
 	return stmt;
 }
 
@@ -189,36 +189,36 @@ struct mes_statement *mes_stmt_sys(struct mes_expression *expr, mes_parameter_li
 
 struct mes_statement *mes_stmt_goto(mes_parameter_list params)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_GOTO);
-	stmt->GOTO.params = params;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_JMP_MES);
+	stmt->CALL.params = params;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_call(mes_parameter_list params)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_CALL);
+	struct mes_statement *stmt = mes_stmt(MES_STMT_CALL_MES);
 	stmt->CALL.params = params;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_proc(mes_parameter_list params)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_PROC);
-	stmt->PROC.params = params;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_CALL_PROC);
+	stmt->CALL.params = params;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_menui(mes_parameter_list params)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_MENUI);
-	stmt->MENUI.params = params;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_DEF_MENU);
+	stmt->DEF_MENU.params = params;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_util(mes_parameter_list params)
 {
 	struct mes_statement *stmt = mes_stmt(MES_STMT_UTIL);
-	stmt->UTIL.params = params;
+	stmt->CALL.params = params;
 	return stmt;
 }
 
@@ -231,14 +231,14 @@ struct mes_statement *mes_stmt_line(uint8_t arg)
 
 struct mes_statement *mes_stmt_procd(struct mes_expression *expr)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_PROCD);
-	stmt->PROCD.no_expr = expr;
+	struct mes_statement *stmt = mes_stmt(MES_STMT_DEF_PROC);
+	stmt->DEF_PROC.no_expr = expr;
 	return stmt;
 }
 
 struct mes_statement *mes_stmt_menus(void)
 {
-	struct mes_statement *stmt = mes_stmt(MES_STMT_MENUS);
+	struct mes_statement *stmt = mes_stmt(MES_STMT_MENU_EXEC);
 	return stmt;
 }
 
@@ -275,39 +275,39 @@ struct mes_expression *mes_expr_constant(long i)
 struct mes_expression *mes_expr_var4(struct mes_expression *index)
 {
 	if (index->op == MES_EXPR_IMM) {
-		struct mes_expression *expr = mes_expr(MES_EXPR_REG16);
+		struct mes_expression *expr = mes_expr(MES_EXPR_GET_FLAG_CONST);
 		expr->arg16 = index->arg8;
 		free(index);
 		return expr;
 	}
 	if (index->op == MES_EXPR_IMM16) {
-		struct mes_expression *expr = mes_expr(MES_EXPR_REG16);
+		struct mes_expression *expr = mes_expr(MES_EXPR_GET_FLAG_CONST);
 		expr->arg16 = index->arg16;
 		free(index);
 		return expr;
 	}
-	struct mes_expression *expr = mes_expr(MES_EXPR_REG8);
+	struct mes_expression *expr = mes_expr(MES_EXPR_GET_FLAG_EXPR);
 	expr->sub_a = index;
 	return expr;
 }
 
 struct mes_expression *mes_expr_var16(uint8_t no)
 {
-	struct mes_expression *expr = mes_expr(MES_EXPR_VAR);
+	struct mes_expression *expr = mes_expr(MES_EXPR_GET_VAR16);
 	expr->arg8 = no;
 	return expr;
 }
 
 struct mes_expression *mes_expr_var32(uint8_t no)
 {
-	struct mes_expression *expr = mes_expr(MES_EXPR_VAR32);
+	struct mes_expression *expr = mes_expr(MES_EXPR_GET_VAR32);
 	expr->arg8 = no;
 	return expr;
 }
 
 struct mes_expression *mes_expr_system_var16(struct mes_expression *index)
 {
-	struct mes_expression *expr = mes_expr(MES_EXPR_ARRAY16_GET16);
+	struct mes_expression *expr = mes_expr(MES_EXPR_PTR16_GET16);
 	expr->arg8 = 0;
 	expr->sub_a = index;
 	return expr;
@@ -315,7 +315,7 @@ struct mes_expression *mes_expr_system_var16(struct mes_expression *index)
 
 struct mes_expression *mes_expr_system_var32(struct mes_expression *index)
 {
-	struct mes_expression *expr = mes_expr(MES_EXPR_ARRAY32_GET32);
+	struct mes_expression *expr = mes_expr(MES_EXPR_PTR32_GET32);
 	expr->arg8 = 0;
 	expr->sub_a = index;
 	return expr;
@@ -327,10 +327,10 @@ struct mes_expression *mes_expr_array_index(enum mes_expression_op op, uint8_t v
 	struct mes_expression *expr = mes_expr(op);
 	expr->arg8 = var_no;
 	switch (op) {
-	case MES_EXPR_ARRAY16_GET16:
-	case MES_EXPR_ARRAY32_GET8:
-	case MES_EXPR_ARRAY32_GET16:
-	case MES_EXPR_ARRAY32_GET32:
+	case MES_EXPR_PTR16_GET16:
+	case MES_EXPR_PTR32_GET8:
+	case MES_EXPR_PTR32_GET16:
+	case MES_EXPR_PTR32_GET32:
 		expr->arg8++;
 		break;
 	default:

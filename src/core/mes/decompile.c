@@ -46,7 +46,7 @@ static struct mes_block *make_basic_block(mes_statement_list statements, struct 
 
 static struct mes_block *make_compound_block(struct mes_statement *head)
 {
-	assert(head->op == MES_STMT_MENUI || head->op == MES_STMT_PROCD);
+	assert(head->op == MES_STMT_DEF_MENU || head->op == MES_STMT_DEF_PROC);
 	struct mes_block *block = xcalloc(1, sizeof(struct mes_block));
 	block->type = MES_BLOCK_COMPOUND;
 	block->post = -1;
@@ -54,10 +54,10 @@ static struct mes_block *make_compound_block(struct mes_statement *head)
 	block->compound.head = head;
 	vector_init(block->compound.blocks);
 
-	if (head->op == MES_STMT_MENUI) {
-		block->compound.end_address = head->MENUI.addr - 1;
+	if (head->op == MES_STMT_DEF_MENU) {
+		block->compound.end_address = head->DEF_MENU.skip_addr - 1;
 	} else {
-		block->compound.end_address = head->PROCD.skip_addr - 1;
+		block->compound.end_address = head->DEF_PROC.skip_addr - 1;
 	}
 
 	return block;
@@ -113,7 +113,7 @@ ERROR("mes file is not terminated by END statement");
 			push_statements(&current, stack[stack_ptr]);
 		}
 		// start of container block: push statements then push new block to stack
-		else if (stmt->op == MES_STMT_MENUI || stmt->op == MES_STMT_PROCD) {
+		else if (stmt->op == MES_STMT_DEF_MENU || stmt->op == MES_STMT_DEF_PROC) {
 			push_statements(&current, stack[stack_ptr-1]);
 			struct mes_block *new_block = make_compound_block(stmt);
 			add_child_block(stack[stack_ptr-1], new_block);
@@ -410,13 +410,13 @@ static void cfg_dom(struct mes_compound_block *compound)
 	}
 
 	/*
-	if (!compound->head || compound->head->op != MES_STMT_PROCD || compound->head->PROCD.no_expr->arg8 != 4)
+	if (!compound->head || compound->head->op != MES_STMT_DEF_PROC || compound->head->DEF_PROC.no_expr->arg8 != 4)
 		goto end;
 	if (!compound->head) {
 		NOTICE("toplevel:");
-	} else if (compound->head->op == MES_STMT_PROCD) {
-		NOTICE("procedure %d:", compound->head->PROCD.no_expr->arg8);
-	} else if (compound->head->op == MES_STMT_MENUI) {
+	} else if (compound->head->op == MES_STMT_DEF_PROC) {
+		NOTICE("procedure %d:", compound->head->DEF_PROC.no_expr->arg8);
+	} else if (compound->head->op == MES_STMT_DEF_MENU) {
 		NOTICE("menu entry:");
 	}
 	vector_foreach(b, compound->post) {
@@ -633,17 +633,17 @@ static struct mes_block *ast_create_node(mes_ast_block *ast_block, struct mes_bl
 	// compound block
 	if (head->type == MES_BLOCK_COMPOUND) {
 		mes_ast_block *body;
-		if (head->compound.head->op == MES_STMT_PROCD) {
+		if (head->compound.head->op == MES_STMT_DEF_PROC) {
 			// procedure definition
 			struct mes_ast *node = make_ast_node(MES_AST_PROCEDURE, head->address);
-			node->proc.num_expr = head->compound.head->PROCD.no_expr;
+			node->proc.num_expr = head->compound.head->DEF_PROC.no_expr;
 			vector_push(struct mes_ast*, *ast_block, node);
 			body = &node->proc.body;
 		} else {
 			// menu entry definition
-			assert(head->compound.head->op == MES_STMT_MENUI);
+			assert(head->compound.head->op == MES_STMT_DEF_MENU);
 			struct mes_ast *node = make_ast_node(MES_AST_MENU_ENTRY, head->address);
-			node->menu.params = head->compound.head->MENUI.params;
+			node->menu.params = head->compound.head->DEF_MENU.params;
 			vector_push(struct mes_ast*, *ast_block, node);
 			body = &node->menu.body;
 		}

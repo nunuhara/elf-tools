@@ -35,7 +35,7 @@ static int get_int_parameter(mes_parameter_list params, unsigned i)
 
 static bool stmt_is_normal_text(struct mes_statement *stmt)
 {
-	return (stmt->op == MES_STMT_TXT || stmt->op == MES_STMT_STR)
+	return (stmt->op == MES_STMT_ZENKAKU || stmt->op == MES_STMT_HANKAKU)
 		&& stmt->TXT.terminated && !stmt->TXT.unprefixed;
 }
 
@@ -69,8 +69,8 @@ void mes_statement_list_foreach_text(mes_statement_list statements,
 			}
 			continue;
 		}
-		if (text && stmt->op == MES_STMT_PROC && next && stmt_is_normal_text(next)) {
-			int f = get_int_parameter(stmt->PROC.params, 0);
+		if (text && stmt->op == MES_STMT_CALL_PROC && next && stmt_is_normal_text(next)) {
+			int f = get_int_parameter(stmt->CALL.params, 0);
 			if (f >= 0 && f == name_function) {
 				text = string_concat_fmt(text, "$%i", f);
 				text_nr_statements++;
@@ -143,13 +143,13 @@ static void _mes_block_print(struct mes_block *block, struct port *out, int inde
 
 	// header
 	indent_print(out, indent);
-	if (block->compound.head->op == MES_STMT_MENUI) {
+	if (block->compound.head->op == MES_STMT_DEF_MENU) {
 		port_puts(out, "menu[");
-		mes_parameter_list_print(block->compound.head->MENUI.params, out);
+		mes_parameter_list_print(block->compound.head->DEF_MENU.params, out);
 		port_puts(out, "] = {\n");
-	} else if (block->compound.head->op == MES_STMT_PROCD) {
+	} else if (block->compound.head->op == MES_STMT_DEF_PROC) {
 		port_puts(out, "procedure[");
-		mes_expression_print(block->compound.head->PROCD.no_expr, out);
+		mes_expression_print(block->compound.head->DEF_PROC.no_expr, out);
 		port_puts(out, "] = {\n");
 	} else assert(false);
 
@@ -162,12 +162,12 @@ static void _mes_block_print(struct mes_block *block, struct port *out, int inde
 	// footer
 	indent_print(out, indent);
 	port_puts(out, "}; // end of ");
-	if (block->compound.head->op == MES_STMT_MENUI) {
+	if (block->compound.head->op == MES_STMT_DEF_MENU) {
 		port_puts(out, "menu entry ");
-		mes_parameter_list_print(block->compound.head->MENUI.params, out);
-	} else if (block->compound.head->op == MES_STMT_PROCD) {
+		mes_parameter_list_print(block->compound.head->DEF_MENU.params, out);
+	} else if (block->compound.head->op == MES_STMT_DEF_PROC) {
 		port_puts(out, "procedure ");
-		mes_expression_print(block->compound.head->PROCD.no_expr, out);
+		mes_expression_print(block->compound.head->DEF_PROC.no_expr, out);
 	} else assert(false);
 	port_puts(out, "\n\n");
 }
@@ -217,12 +217,12 @@ static void _mes_block_tree_print(struct mes_block *block, struct port *out, int
 		port_putc(out, '\n');
 		return;
 	}
-	if (block->compound.head->op == MES_STMT_MENUI) {
+	if (block->compound.head->op == MES_STMT_DEF_MENU) {
 		port_puts(out, "MENU ENTRY ");
-		mes_parameter_list_print(block->compound.head->MENUI.params, out);
-	} else if (block->compound.head->op == MES_STMT_PROCD) {
+		mes_parameter_list_print(block->compound.head->DEF_MENU.params, out);
+	} else if (block->compound.head->op == MES_STMT_DEF_PROC) {
 		port_puts(out, "PROCEDURE ");
-		mes_expression_print(block->compound.head->PROCD.no_expr, out);
+		mes_expression_print(block->compound.head->DEF_PROC.no_expr, out);
 	} else assert(false);
 	port_putc(out, '\n');
 

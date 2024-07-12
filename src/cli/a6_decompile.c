@@ -47,21 +47,18 @@ static void a6_dims(a6_array a, unsigned *w, unsigned *h)
 
 static struct cg *a6_to_image(a6_array a)
 {
-	struct cg *cg = xcalloc(1, sizeof(struct cg));
-	a6_dims(a, &cg->metrics.w, &cg->metrics.h);
-	cg->metrics.bpp = 8;
+	unsigned w, h;
+	a6_dims(a, &w, &h);
 
-	if (cg->metrics.w == 0 || cg->metrics.w > 1920)
-		sys_error("Invalid width for image: %u\n", cg->metrics.w);
-	if (cg->metrics.h == 0 || cg->metrics.h > 1080)
-		sys_error("Invalid height for image: %u\n", cg->metrics.h);
+	if (w == 0 || w > 1920)
+		sys_error("Invalid width for image: %u\n", w);
+	if (h == 0 || h > 1080)
+		sys_error("Invalid height for image: %u\n", h);
 
-	cg->palette = xcalloc(256, 4);
+	struct cg *cg = cg_alloc_indexed(w, h);
 	cg->palette[4] = 255;
 	cg->palette[5] = 255;
 	cg->palette[6] = 255;
-
-	cg->pixels = xcalloc(cg->metrics.w, cg->metrics.h);
 
 	struct a6_entry *e;
 	vector_foreach_p(e, a) {

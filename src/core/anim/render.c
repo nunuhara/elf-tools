@@ -425,19 +425,12 @@ static bool stream_render(struct anim *anim, unsigned stream, struct stream_stat
 
 static struct cg *make_blank_cg(struct cg *src)
 {
-	struct cg *dst = xcalloc(1, sizeof(struct cg));
-	dst->metrics.x = 0;
-	dst->metrics.y = 0;
+	struct cg *dst;
 	if (src->palette) {
-		dst->metrics.w = 640;
-		dst->metrics.h = 400;
-		dst->pixels = xcalloc(640 * 400, 1);
-		dst->palette = xmalloc(256 * 4);
+		dst = cg_alloc_indexed(640, 400);
 		memcpy(dst->palette, src->palette, 256 * 4);
 	} else {
-		dst->metrics.w = 640;
-		dst->metrics.h = 480;
-		dst->pixels = xcalloc(640 * 480, 4);
+		dst = cg_alloc_direct(640, 480);
 	}
 	return dst;
 }

@@ -137,15 +137,15 @@ primary_expr
 	| VAR16 '[' I_CONSTANT ']' { $$ = mes_expr_var16(mf_parse_u8($3)); }
 	| VAR32 '[' I_CONSTANT ']' { $$ = mes_expr_var32(mf_parse_u8($3)); }
 	| VAR16 '[' I_CONSTANT ']' ARROW BYTE '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY16_GET8, mf_parse_u8($3), $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_PTR16_GET8, mf_parse_u8($3), $8); }
 	| VAR16 '[' I_CONSTANT ']' ARROW WORD '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY16_GET16, mf_parse_u8($3), $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_PTR16_GET16, mf_parse_u8($3), $8); }
 	| VAR32 '[' I_CONSTANT ']' ARROW BYTE '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY32_GET8, mf_parse_u8($3), $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_PTR32_GET8, mf_parse_u8($3), $8); }
 	| VAR32 '[' I_CONSTANT ']' ARROW WORD '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY32_GET16, mf_parse_u8($3), $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_PTR32_GET16, mf_parse_u8($3), $8); }
 	| VAR32 '[' I_CONSTANT ']' ARROW DWORD '[' expr ']'
-	  { $$ = mes_expr_array_index(MES_EXPR_ARRAY32_GET32, mf_parse_u8($3), $8); }
+	  { $$ = mes_expr_array_index(MES_EXPR_PTR32_GET32, mf_parse_u8($3), $8); }
 	| SYSTEM '.' VAR16 '[' expr ']' { $$ = mes_expr_system_var16($5); }
 	| SYSTEM '.' VAR32 '[' expr ']' { $$ = mes_expr_system_var32($5); }
 	| SYSTEM '.' IDENTIFIER { $$ = mf_expr_named_sysvar($3); }

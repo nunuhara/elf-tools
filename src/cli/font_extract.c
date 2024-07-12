@@ -66,7 +66,7 @@ static void extract_font(const char *output_path, uint8_t *fnt, size_t fnt_size,
 	const unsigned nr_chars = fnt_size / char_size;
 	const unsigned nr_rows = ((nr_chars + 15) & ~15) / 16;
 
-	struct cg *cg = xcalloc(1, sizeof(struct cg));
+	struct cg *cg = cg_alloc();
 	cg->metrics.w = char_w * 16;
 	cg->metrics.h = char_h * nr_rows;
 	cg->metrics.bpp = 32;
