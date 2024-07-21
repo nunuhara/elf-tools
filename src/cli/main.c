@@ -136,6 +136,18 @@ struct command cmd_mes = {
 	}
 };
 
+struct command cmd_mp3 = {
+	.name = "mp3",
+	.usage = "<command> ...",
+	.description = "Tools for packing and unpacking .mp3 files",
+	.parent = &cmd_elf,
+	.commands = {
+		&cmd_mp3_extract,
+		&cmd_mp3_render,
+		NULL
+	}
+};
+
 struct command cmd_mpx = {
 	.name = "mpx",
 	.usage = "<command> ...",
@@ -163,6 +175,7 @@ struct command cmd_elf = {
 		&cmd_font,
 		&cmd_lzss,
 		&cmd_mes,
+		&cmd_mp3,
 		&cmd_mpx,
 		&cmd_save,
 		NULL

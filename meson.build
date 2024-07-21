@@ -46,6 +46,8 @@ sources = [
   'src/cli/main.c',
   'src/cli/mes_compile.c',
   'src/cli/mes_decompile.c',
+  'src/cli/mp3_extract.c',
+  'src/cli/mp3_render.c',
   'src/cli/mpx_unpack.c',
   'src/cli/save.c',
 ]
