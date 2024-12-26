@@ -111,6 +111,7 @@ static void draw_call_clip(struct anim_draw_call *call, struct cg *src, struct c
 				TARGET(call->copy.src), TARGET(call->copy.dst));
 		break;
 	case ANIM_DRAW_OP_COMPOSE:
+	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
 		// FIXME: this is not quite correct, but it shouldn't matter since
 		//        clipping is an error condition anyways
 		copy_clip(&call->compose.bg, &call->compose.dst, &call->compose.dim,
@@ -120,6 +121,15 @@ static void draw_call_clip(struct anim_draw_call *call, struct cg *src, struct c
 		break;
 	case ANIM_DRAW_OP_SET_COLOR:
 	case ANIM_DRAW_OP_SET_PALETTE:
+		break;
+	case ANIM_DRAW_OP_0x60_COPY_MASKED:
+	case ANIM_DRAW_OP_0x61_COMPOSE:
+	case ANIM_DRAW_OP_0x62:
+	case ANIM_DRAW_OP_0x63_COPY_MASKED_WITH_XOFFSET:
+	case ANIM_DRAW_OP_0x64_COMPOSE_MASKED:
+	case ANIM_DRAW_OP_0x65_COMPOSE:
+	case ANIM_DRAW_OP_0x66:
+		ERROR("Unhandled draw op: %d", call->op);
 		break;
 	}
 #undef TARGET
@@ -313,9 +323,23 @@ static void stream_render_draw_direct(struct anim_draw_call *call, struct cg *sr
 		stream_render_direct_swap(&call->copy, TARGET(call->copy.src),
 				TARGET(call->copy.dst));
 		break;
+	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
+		// XXX: the offset is controlled by the game, so the best we can do
+		//      is render with a static offset (0)
+		WARNING("COMPOSE_WITH_OFFSET will not render correctly");
+		// fallthrough
 	case ANIM_DRAW_OP_COMPOSE:
 		stream_render_direct_compose(&call->compose, TARGET(call->compose.fg),
 				TARGET(call->compose.bg), TARGET(call->compose.dst));
+		break;
+	case ANIM_DRAW_OP_0x60_COPY_MASKED:
+	case ANIM_DRAW_OP_0x61_COMPOSE:
+	case ANIM_DRAW_OP_0x62:
+	case ANIM_DRAW_OP_0x63_COPY_MASKED_WITH_XOFFSET:
+	case ANIM_DRAW_OP_0x64_COMPOSE_MASKED:
+	case ANIM_DRAW_OP_0x65_COMPOSE:
+	case ANIM_DRAW_OP_0x66:
+		ERROR("Unimplemented draw call: %d", call->op);
 		break;
 	default:
 		ERROR("Invalid draw call");
@@ -355,6 +379,16 @@ static void stream_render_draw(struct anim_draw_call *call, struct cg *src, stru
 		break;
 	case ANIM_DRAW_OP_SET_PALETTE:
 		stream_render_indexed_set_palette(&call->set_palette, src, dst);
+		break;
+	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
+	case ANIM_DRAW_OP_0x60_COPY_MASKED:
+	case ANIM_DRAW_OP_0x61_COMPOSE:
+	case ANIM_DRAW_OP_0x62:
+	case ANIM_DRAW_OP_0x63_COPY_MASKED_WITH_XOFFSET:
+	case ANIM_DRAW_OP_0x64_COMPOSE_MASKED:
+	case ANIM_DRAW_OP_0x65_COMPOSE:
+	case ANIM_DRAW_OP_0x66:
+		ERROR("Invalid draw call: %d", call->op);
 		break;
 	}
 #undef TARGET

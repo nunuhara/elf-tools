@@ -95,10 +95,18 @@ static bool draw_call_eq(struct anim_draw_call *a, struct anim_draw_call *b)
 	case ANIM_DRAW_OP_COPY:
 	case ANIM_DRAW_OP_COPY_MASKED:
 	case ANIM_DRAW_OP_SWAP:
+	case ANIM_DRAW_OP_0x60_COPY_MASKED:
+	case ANIM_DRAW_OP_0x62:
+	case ANIM_DRAW_OP_0x63_COPY_MASKED_WITH_XOFFSET:
+	case ANIM_DRAW_OP_0x66:
 		return anim_target_eq(&a->copy.src, &b->copy.src)
 				&& anim_target_eq(&a->copy.dst, &b->copy.dst)
 				&& anim_size_eq(&a->copy.dim, &b->copy.dim);
+	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
 	case ANIM_DRAW_OP_COMPOSE:
+	case ANIM_DRAW_OP_0x61_COMPOSE:
+	case ANIM_DRAW_OP_0x64_COMPOSE_MASKED:
+	case ANIM_DRAW_OP_0x65_COMPOSE:
 		return anim_target_eq(&a->compose.fg, &b->compose.fg)
 				&& anim_target_eq(&a->compose.bg, &b->compose.bg)
 				&& anim_target_eq(&a->compose.dst, &b->compose.dst)

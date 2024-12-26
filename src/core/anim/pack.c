@@ -30,6 +30,15 @@ static enum anim_s4_draw_opcode anim_to_s4_draw_opcode(enum anim_draw_opcode op)
 	case ANIM_DRAW_OP_COMPOSE: return ANIM_S4_DRAW_OP_COMPOSE;
 	case ANIM_DRAW_OP_FILL: return ANIM_S4_DRAW_OP_FILL;
 	case ANIM_DRAW_OP_SET_PALETTE: return ANIM_S4_DRAW_OP_SET_PALETTE;
+	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
+	case ANIM_DRAW_OP_0x60_COPY_MASKED:
+	case ANIM_DRAW_OP_0x61_COMPOSE:
+	case ANIM_DRAW_OP_0x62:
+	case ANIM_DRAW_OP_0x63_COPY_MASKED_WITH_XOFFSET:
+	case ANIM_DRAW_OP_0x64_COMPOSE_MASKED:
+	case ANIM_DRAW_OP_0x65_COMPOSE:
+	case ANIM_DRAW_OP_0x66:
+		break;
 	}
 	ERROR("Invalid draw call opcode: %u", op);
 }
@@ -110,6 +119,15 @@ static void pack_s4_draw_call(struct buffer *out, struct anim_draw_call *call)
 	case ANIM_DRAW_OP_SET_PALETTE:
 		pack_s4_set_palette_call(out, &call->set_palette);
 		break;
+	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
+	case ANIM_DRAW_OP_0x60_COPY_MASKED:
+	case ANIM_DRAW_OP_0x61_COMPOSE:
+	case ANIM_DRAW_OP_0x62:
+	case ANIM_DRAW_OP_0x63_COPY_MASKED_WITH_XOFFSET:
+	case ANIM_DRAW_OP_0x64_COMPOSE_MASKED:
+	case ANIM_DRAW_OP_0x65_COMPOSE:
+	case ANIM_DRAW_OP_0x66:
+		break;
 	}
 
 	int rem = (start + anim_draw_call_size) - out->index;
@@ -118,23 +136,8 @@ static void pack_s4_draw_call(struct buffer *out, struct anim_draw_call *call)
 	}
 }
 
-static enum anim_a_draw_opcode anim_to_a_draw_opcode(enum anim_draw_opcode op)
+static void pack_a_copy_args(struct buffer *out, struct anim_copy_args *copy)
 {
-	switch (op) {
-	case ANIM_DRAW_OP_COPY: return ANIM_A_DRAW_OP_COPY;
-	case ANIM_DRAW_OP_COPY_MASKED: return ANIM_A_DRAW_OP_COPY_MASKED;
-	case ANIM_DRAW_OP_SWAP: return ANIM_A_DRAW_OP_SWAP;
-	case ANIM_DRAW_OP_COMPOSE: return ANIM_A_DRAW_OP_COMPOSE;
-	default: break;
-	}
-	ERROR("Invalid draw call opcode: %u", op);
-}
-
-static void pack_a_copy_call(struct buffer *out, enum anim_draw_opcode op,
-		struct anim_copy_args *copy)
-{
-	enum anim_a_draw_opcode a_op = anim_to_a_draw_opcode(op);
-	buffer_write_u8(out, a_op | copy->dst.i | (copy->src.i << 1));
 	buffer_write_u16(out, copy->src.x);
 	buffer_write_u16(out, copy->src.y);
 	buffer_write_u16(out, copy->dim.w);
@@ -143,9 +146,8 @@ static void pack_a_copy_call(struct buffer *out, enum anim_draw_opcode op,
 	buffer_write_u16(out, copy->dst.y);
 }
 
-static void pack_a_compose_call(struct buffer *out, struct anim_compose_args *call)
+static void pack_a_compose_args(struct buffer *out, struct anim_compose_args *call)
 {
-	buffer_write_u8(out, ANIM_A_DRAW_OP_COMPOSE | call->bg.i | (call->fg.i << 1) | (call->dst.i << 2));
 	buffer_write_u16(out, call->fg.x);
 	buffer_write_u16(out, call->fg.y);
 	buffer_write_u16(out, call->dim.w);
@@ -156,20 +158,77 @@ static void pack_a_compose_call(struct buffer *out, struct anim_compose_args *ca
 		WARNING("Compose call has different coordinate for BG and DST areas");
 }
 
+static uint8_t a_draw_call_opcode(struct anim_draw_call *call)
+{
+	switch (call->op) {
+	case ANIM_DRAW_OP_COPY:
+		return ANIM_A_DRAW_OP_COPY | call->copy.dst.i | (call->copy.src.i << 1);
+	case ANIM_DRAW_OP_COPY_MASKED:
+		return ANIM_A_DRAW_OP_COPY_MASKED | call->copy.dst.i | (call->copy.src.i << 1);
+	case ANIM_DRAW_OP_SWAP:
+		return ANIM_A_DRAW_OP_SWAP | call->copy.dst.i | (call->copy.src.i << 1);
+	case ANIM_DRAW_OP_COMPOSE:
+		return ANIM_A_DRAW_OP_COMPOSE | call->compose.bg.i | (call->compose.fg.i << 1) | (call->compose.dst.i << 2);
+	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
+		return 0x30 | call->compose.bg.i | (call->compose.fg.i << 1) | (call->compose.dst.i << 2);
+	case ANIM_DRAW_OP_0x60_COPY_MASKED:
+		return 0x60;
+	case ANIM_DRAW_OP_0x61_COMPOSE:
+		return 0x61;
+	case ANIM_DRAW_OP_0x62:
+		return 0x62;
+	case ANIM_DRAW_OP_0x63_COPY_MASKED_WITH_XOFFSET:
+		return 0x63;
+	case ANIM_DRAW_OP_0x64_COMPOSE_MASKED:
+		return 0x64;
+	case ANIM_DRAW_OP_0x65_COMPOSE:
+		return 0x65;
+	case ANIM_DRAW_OP_0x66:
+		return 0x66;
+	default:
+		ERROR("Invalid draw call: %u", call->op);
+	}
+}
+
 static void pack_a_draw_call(struct buffer *out, struct anim_draw_call *call)
 {
+	struct anim_copy_args copy_args;
 	size_t start = out->index;
+	buffer_write_u8(out, a_draw_call_opcode(call));
 	switch (call->op) {
 	case ANIM_DRAW_OP_COPY:
 	case ANIM_DRAW_OP_COPY_MASKED:
 	case ANIM_DRAW_OP_SWAP:
-		pack_a_copy_call(out, call->op, &call->copy);
+	case ANIM_DRAW_OP_0x62:
+	case ANIM_DRAW_OP_0x66:
+		pack_a_copy_args(out, &call->copy);
 		break;
 	case ANIM_DRAW_OP_COMPOSE:
-		pack_a_compose_call(out, &call->compose);
+	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
+	case ANIM_DRAW_OP_0x64_COMPOSE_MASKED:
+	case ANIM_DRAW_OP_0x65_COMPOSE:
+		pack_a_compose_args(out, &call->compose);
+		break;
+	case ANIM_DRAW_OP_0x60_COPY_MASKED:
+		copy_args = call->copy;
+		copy_args.dst.y += 8;
+		pack_a_copy_args(out, &copy_args);
+		break;
+	case ANIM_DRAW_OP_0x61_COMPOSE:
+		buffer_write_u16(out, call->compose.fg.x);
+		buffer_write_u16(out, call->compose.fg.y);
+		buffer_write_u16(out, call->compose.dim.w);
+		buffer_write_u16(out, call->compose.dim.h);
+		buffer_write_u16(out, call->compose.dst.x);
+		buffer_write_u16(out, call->compose.dst.y);
+		break;
+	case ANIM_DRAW_OP_0x63_COPY_MASKED_WITH_XOFFSET:
+		copy_args = call->copy;
+		copy_args.dst.y -= 20;
+		pack_a_copy_args(out, &copy_args);
 		break;
 	default:
-		ERROR("invalid draw call: %u", call->op);
+		ERROR("Invalid draw call: %u", call->op);
 	}
 
 	int rem = (start + anim_draw_call_size) - out->index;
