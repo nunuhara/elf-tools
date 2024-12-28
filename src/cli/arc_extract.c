@@ -256,11 +256,56 @@ static void extract_all(struct archive *arc, const char *_output_dir)
 	free(output_dir);
 }
 
+enum archive_data_type {
+	ARC_OTHER,
+	ARC_MES,
+	ARC_DATA,
+	ARC_PCM,
+};
+
+static bool suffix_equal(const char *str, const char *suffix)
+{
+	size_t str_len = strlen(str);
+	size_t suffix_len = strlen(suffix);
+	if (str_len < suffix_len)
+		return false;
+
+	const char *start = str + (str_len - suffix_len);
+	return !strcasecmp(start, suffix);
+}
+
+static enum archive_data_type arc_data_type(const char *path)
+{
+	if (suffix_equal(path, "mes.arc"))
+		return ARC_MES;
+	if (suffix_equal(path, "data.arc"))
+		return ARC_DATA;
+	if (suffix_equal(path, ".awd") || suffix_equal(path, ".awf"))
+		return ARC_PCM;
+	return ARC_OTHER;
+}
+
+bool arc_is_compressed(const char *path)
+{
+	if (ai5_target_game == GAME_ALLSTARS)
+		return false;
+
+	enum archive_data_type t = arc_data_type(path);
+	if (t == ARC_PCM)
+		return true;
+	if (ai5_target_game == GAME_KAKYUUSEI)
+		return t == ARC_MES;
+
+	// TODO: try to read bMESTYPE / bDATATYPE from AI5WIN.INI?
+	return t == ARC_MES || t == ARC_DATA;
+}
+
 enum {
 	LOPT_OUTPUT = 256,
 	LOPT_GAME,
 	LOPT_NAME,
 	LOPT_RAW,
+	LOPT_DECOMPRESS,
 	LOPT_NO_DECOMPRESS,
 	LOPT_MES_FLAT,
 	LOPT_MES_TEXT,
@@ -275,6 +320,8 @@ int arc_extract(int argc, char *argv[])
 	const char *name = NULL;
 	bool key = false;
 	unsigned flags = 0;
+	bool no_decompress = false;
+	bool decompress = false;
 	while (1) {
 		int c = command_getopt(argc, argv, &cmd_arc_extract);
 		if (c == -1)
@@ -295,9 +342,11 @@ int arc_extract(int argc, char *argv[])
 		case LOPT_RAW:
 			raw = true;
 			break;
+		case LOPT_DECOMPRESS:
+			decompress = true;
+			break;
 		case LOPT_NO_DECOMPRESS:
-			raw = true;
-			flags |= ARCHIVE_RAW;
+			no_decompress = true;
 			break;
 		case LOPT_MES_FLAT:
 			mes_flat = true;
@@ -321,6 +370,9 @@ int arc_extract(int argc, char *argv[])
 
 	if (argc != 1)
 		command_usage_error(&cmd_arc_extract, "Wrong number of arguments.\n");
+
+	if (no_decompress || (!decompress && !arc_is_compressed(argv[0])))
+		flags |= ARCHIVE_RAW;
 
 	struct archive *arc = archive_open(argv[0], flags);
 	if (!arc)
@@ -350,6 +402,7 @@ struct command cmd_arc_extract = {
 		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
 		{ "name", 'n', "Specify the file to extract", required_argument, LOPT_NAME },
 		{ "raw", 0, "Do not convert (keep original file type)", no_argument, LOPT_RAW },
+		{ "decompress", 0, "Decompress files", no_argument, LOPT_DECOMPRESS },
 		{ "no-decompress", 0, "Do not decompress files", no_argument, LOPT_NO_DECOMPRESS },
 		{ "mes-flat", 0, "Output flat mes files", no_argument, LOPT_MES_FLAT },
 		{ "mes-text", 0, "Output text for mes files", no_argument, LOPT_MES_TEXT },

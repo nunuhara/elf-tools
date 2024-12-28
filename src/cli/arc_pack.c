@@ -232,10 +232,10 @@ bool arc_write(const char *path, arc_file_list files, struct arc_metadata *meta)
  * Prepare an arc_file struct for a given filesystem path
  * (not necessarily an ARC_FILE_FS, if conversion is involved).
  */
-static struct arc_file arc_file_fs(string path, string name)
+static struct arc_file arc_file_fs(string path, string name, bool compress)
 {
 	// handle conversions
-	if (archive_file_compressed(path)) {
+	if (compress) {
 		size_t raw_size;
 		uint8_t *raw_data = file_read(path, &raw_size);
 		if (!raw_data)
@@ -282,7 +282,7 @@ static string path_to_arc_name(string path)
  * Prepare an arc_file_list for an ARCPACK manifest.
  */
 static arc_file_list arcpack_file_list(struct arc_arcpack_manifest *mf,
-		struct archive **arc_out, struct arc_metadata *meta)
+		struct archive **arc_out, struct arc_metadata *meta, bool compress)
 {
 	struct archive *arc = NULL;
 	arc_file_list files = vector_initializer;
@@ -313,10 +313,10 @@ static arc_file_list arcpack_file_list(struct arc_arcpack_manifest *mf,
 			// if name appears in input archive, replace the entry
 			struct arc_file *f = &vector_A(files, i);
 			arc_file_free(f);
-			*f = arc_file_fs(path, name);
+			*f = arc_file_fs(path, name, compress);
 		} else {
 			// otherwise add a new entry
-			vector_push(struct arc_file, files, arc_file_fs(path, name));
+			vector_push(struct arc_file, files, arc_file_fs(path, name, compress));
 		}
 	}
 
@@ -407,9 +407,14 @@ static void set_key_by_game(const char *name, struct arc_metadata *meta)
 	*meta = game_keys[id];
 }
 
+// arc_extract.c
+bool arc_is_compressed(const char *path);
+
 enum {
 	LOPT_GAME = 256,
 	LOPT_KEY,
+	LOPT_COMPRESS,
+	LOPT_NO_COMPRESS,
 };
 
 static int cli_arc_pack(int argc, char *argv[])
@@ -420,6 +425,8 @@ static int cli_arc_pack(int argc, char *argv[])
 		.size_key    = 0xaa55aa55,
 		.name_key    = 0x55,
 	};
+	bool compress = false;
+	bool no_compress = false;
 	while (1) {
 		int c = command_getopt(argc, argv, &cmd_arc_pack);
 		if (c == -1)
@@ -432,6 +439,12 @@ break;
 		case LOPT_GAME:
 			ai5_set_game(optarg);
 			set_key_by_game(optarg, &meta);
+			break;
+		case LOPT_COMPRESS:
+			compress = true;
+			break;
+		case LOPT_NO_COMPRESS:
+			no_compress = true;
 			break;
 		}
 	}
@@ -448,8 +461,11 @@ break;
 	if (mf->type != ARC_MF_ARCPACK)
 		sys_error("Unsupported manifest type.\n");
 
+	if (!compress && !no_compress)
+		compress = arc_is_compressed(mf->output_path);
+
 	struct archive *arc = NULL;
-	arc_file_list files = arcpack_file_list(&mf->arcpack, &arc, &meta);
+	arc_file_list files = arcpack_file_list(&mf->arcpack, &arc, &meta, compress);
 	arc_write(mf->output_path, files, &meta);
 
 	if (arc)
@@ -468,6 +484,8 @@ struct command cmd_arc_pack = {
 	.options = {
 		{ "key", 0, "Specify the index encryption key", required_argument, LOPT_KEY },
 		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
+		{ "compress", 0, "Compress archived files", no_argument, LOPT_COMPRESS },
+		{ "no-compress", 0, "Do not compress archived files", no_argument, LOPT_NO_COMPRESS },
 		{ 0 }
 	}
 };
