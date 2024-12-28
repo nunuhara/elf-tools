@@ -94,6 +94,12 @@ void write_bytes(struct port *out, uint8_t *data, size_t size)
 		sys_error("Write failure: %s\n", strerror(errno));
 }
 
+static void arc_seek(struct port *out, unsigned off)
+{
+	if (!port_seek(out, off))
+		sys_error("Seek failure: %s\n", strerror(errno));
+}
+
 static void arc_file_fs_write(struct port *out, struct arc_file *f)
 {
 	size_t size;
@@ -128,8 +134,56 @@ static void arc_file_write(struct port *out, struct arc_file *f)
 	f->packed_size = port_tell(out) - f->packed_offset;
 }
 
+static void kakyuusei_write_index(struct port *out, arc_file_list files)
+{
+	static uint8_t shuffle_table[20] = {
+		17, 2, 8, 19, 0, 5, 10, 13, 1, 15, 6, 4, 11, 16, 3, 9, 18, 12, 7, 14
+	};
+
+	uint8_t enc[20];
+	uint8_t raw[20];
+	uint8_t key = vector_length(files);
+	struct arc_file *f;
+	vector_foreach_p(f, files) {
+		string name = arc_file_name(f);
+		for (int i = 0; i < 12; i++) {
+			raw[i] = i < string_length(name) ? name[i] : 0;
+		}
+		le_put32(raw, 12, f->packed_size);
+		le_put32(raw, 16, f->packed_offset);
+
+		for (int i = 0; i < 20; i++) {
+			enc[i] = raw[shuffle_table[i]] ^ key;
+			key = ((int)key * 3 + 1) & 0xff;
+		}
+		write_bytes(out, enc, 20);
+	}
+}
+
+static bool arc_write_kakyuusei(const char *path, arc_file_list files)
+{
+	struct port out;
+	if (!port_file_open(&out, path))
+		sys_error("Failed to open \"%s\": %s\n", path, strerror(errno));
+
+	write_u32(&out, vector_length(files));
+	arc_seek(&out, 4 + vector_length(files) * 20);
+
+	struct arc_file *f;
+	vector_foreach_p(f, files) {
+		arc_file_write(&out, f);
+	}
+
+	arc_seek(&out, 4);
+	kakyuusei_write_index(&out, files);
+	return true;
+}
+
 bool arc_write(const char *path, arc_file_list files, struct arc_metadata *meta)
 {
+	if (ai5_target_game == GAME_KAKYUUSEI)
+		return arc_write_kakyuusei(path, files);
+
 	struct port out;
 	if (!port_file_open(&out, path))
 		sys_error("Failed to open \"%s\": %s\n", path, strerror(errno));
@@ -346,6 +400,8 @@ static struct arc_metadata game_keys[] = {
 static void set_key_by_game(const char *name, struct arc_metadata *meta)
 {
 	enum ai5_game_id id = ai5_parse_game_id(name);
+	if (id == GAME_KAKYUUSEI)
+		return;
 	if (id >= ARRAY_SIZE(game_keys))
 		sys_error("Key for game \"%s\" is unknown.\n", name);
 	*meta = game_keys[id];
