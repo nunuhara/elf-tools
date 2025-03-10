@@ -107,8 +107,10 @@ static bool extract_mes(struct archive_data *data, const char *output_file)
 
 static bool extract_cg(struct archive_data *data, const char *output_file)
 {
+	char name[512];
+	snprintf(name, 512, "%s.PNG", output_file);
 	struct port out;
-	if (!open_output_file(output_file, &out))
+	if (!open_output_file(name, &out))
 		return false;
 
 	struct cg *cg = cg_load_arcdata(data);
@@ -150,7 +152,7 @@ static bool extract_anim(struct archive_data *data, const char *output_file)
 static bool ext_is_cg(const char *ext)
 {
 	static const char * const cg_ext[] = {
-		"GP8", "G16", "G24", "G32", "GCC"
+		"GP8", "G16", "G24", "G32", "GCC", "GPX"
 	};
 	for (unsigned i = 0; i < ARRAY_SIZE(cg_ext); i++) {
 		if (!strcasecmp(ext, cg_ext[i]))

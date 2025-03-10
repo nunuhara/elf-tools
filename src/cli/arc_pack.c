@@ -22,8 +22,8 @@
 #include "nulib.h"
 #include "nulib/buffer.h"
 #include "nulib/file.h"
-#include "nulib/lzss.h"
 #include "nulib/port.h"
+#include "ai5/lzss.h"
 #include "ai5/game.h"
 
 #include "cli.h"

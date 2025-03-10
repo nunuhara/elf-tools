@@ -20,7 +20,7 @@
 
 #include "nulib.h"
 #include "nulib/file.h"
-#include "nulib/lzss.h"
+#include "ai5/lzss.h"
 
 #include "cli.h"
 

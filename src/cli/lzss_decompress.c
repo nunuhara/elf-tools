@@ -20,17 +20,19 @@
 
 #include "nulib.h"
 #include "nulib/file.h"
-#include "nulib/lzss.h"
+#include "ai5/lzss.h"
 
 #include "cli.h"
 
 enum {
 	LOPT_OUTPUT = 256,
+	LOPT_BITWISE,
 };
 
 static int cli_lzss_decompress(int argc, char *argv[])
 {
 	char *output_file = NULL;
+	bool bitwise = false;
 
 	while (1) {
 		int c = command_getopt(argc, argv, &cmd_lzss_decompress);
@@ -41,6 +43,9 @@ static int cli_lzss_decompress(int argc, char *argv[])
 		case 'o':
 		case LOPT_OUTPUT:
 			output_file = optarg;
+			break;
+		case LOPT_BITWISE:
+			bitwise = true;
 			break;
 		}
 	}
@@ -56,7 +61,11 @@ static int cli_lzss_decompress(int argc, char *argv[])
 		sys_error("Error reading input file \"%s\": %s", argv[0], strerror(errno));
 
 	size_t out_size;
-	uint8_t *out_data = lzss_decompress(data, data_size, &out_size);
+	uint8_t *out_data;
+	if (bitwise)
+		out_data = lzss_bw_decompress(data, data_size, &out_size);
+	else
+		out_data = lzss_decompress(data, data_size, &out_size);
 	free(data);
 
 	if (!file_write(output_file ? output_file : "out.dat", out_data, out_size))
@@ -75,6 +84,7 @@ struct command cmd_lzss_decompress = {
 	.fun = cli_lzss_decompress,
 	.options = {
 		{ "output", 'o', "Set the output file path", required_argument, LOPT_OUTPUT },
+		{ "bitwise", 0, "Use \"bitwise\" LZSS decoder", no_argument, LOPT_BITWISE },
 		{ 0 }
 	}
 };
