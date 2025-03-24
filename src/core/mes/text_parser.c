@@ -24,13 +24,75 @@
 #include "nulib/string.h"
 #include "nulib/vector.h"
 #include "nulib/utfsjis.h"
+#include "ai5/game.h"
 
 #include "mes.h"
+
+struct mes_encoder {
+	struct mes_statement *(*text)(string, bool);
+	struct mes_statement *(*line)(void);
+	struct mes_statement *(*call)(unsigned);
+};
+
+struct mes_statement *ai5_encode_text(string text, bool zenkaku)
+{
+	return zenkaku ? mes_stmt_txt(text) : mes_stmt_str(text);
+}
+
+struct mes_statement *ai5_encode_line(void)
+{
+	return mes_stmt_line(0);
+}
+
+struct mes_statement *ai5_encode_call(unsigned fno)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_CALL_PROC);
+	vector_push(struct mes_parameter, stmt->CALL.params, mes_param_expr(mes_expr_constant(fno)));
+	return stmt;
+}
+
+static struct mes_encoder ai5_encoder = {
+	.text = ai5_encode_text,
+	.line = ai5_encode_line,
+	.call = ai5_encode_call,
+};
+
+struct mes_statement *aiw_encode_text(string text, bool zenkaku)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_TXT);
+	if (!zenkaku && string_length(text) % 2 != 0) {
+		text = string_grow(text, string_length(text) + 1);
+		text[string_length(text) - 1] = '0';
+	}
+	stmt->TXT.text = text;
+	stmt->TXT.terminated = true;
+	return stmt;
+}
+
+struct mes_statement *aiw_encode_line(void)
+{
+	return NULL;
+}
+
+struct mes_statement *aiw_encode_call(unsigned fno)
+{
+	struct mes_statement *stmt = stmt = aiw_mes_stmt(AIW_MES_STMT_CALL_PROC);
+	vector_push(struct mes_parameter, stmt->CALL.params, mes_param_expr(mes_expr_constant(fno)));
+	return stmt;
+}
+
+static struct mes_encoder aiw_encoder = {
+	.text = aiw_encode_text,
+	.line = aiw_encode_line,
+	.call = aiw_encode_call,
+};
 
 struct mes_text_sub_state {
 	unsigned line;
 	int columns;
 };
+
+static struct mes_encoder *mes_encoder = &ai5_encoder;
 
 #define PARSE_ERROR(state, msg, ...) \
 	sys_warning("Parse error: At line %d: " msg "\n", (state)->line + 1, ##__VA_ARGS__)
@@ -368,6 +430,8 @@ static uint32_t addr_table_get(hashtable_t(addr_table) *table, uint32_t addr)
 // update statement address and push to statement list
 static void push_stmt(struct mes_statement *stmt, mes_statement_list *mes, uint32_t *mes_addr)
 {
+	if (!stmt)
+		return;
 	stmt->address = *mes_addr;
 	*mes_addr += mes_statement_size(stmt);
 	vector_push(struct mes_statement*, *mes, stmt);
@@ -377,14 +441,7 @@ static void push_string(const char *text, size_t len, bool zenkaku,
 		mes_statement_list *mes, uint32_t *mes_addr)
 {
 	string str = string_new_len(text, len);
-	struct mes_statement *stmt = zenkaku ? mes_stmt_txt(str) : mes_stmt_str(str);
-	push_stmt(stmt, mes, mes_addr);
-}
-
-static void push_call(unsigned fno, mes_statement_list *mes, uint32_t *mes_addr)
-{
-	struct mes_statement *stmt = mes_stmt(MES_STMT_CALL_PROC);
-	vector_push(struct mes_parameter, stmt->CALL.params, mes_param_expr(mes_expr_constant(fno)));
+	struct mes_statement *stmt = mes_encoder->text(str, zenkaku);
 	push_stmt(stmt, mes, mes_addr);
 }
 
@@ -415,7 +472,7 @@ bool encode_substitution(struct mes_text_substitution *sub, mes_statement_list *
 			if (++line_no >= vector_length(sub->to))
 				break;
 			if (line.columns < sub->columns)
-				push_stmt(mes_stmt_line(0), mes, mes_addr);
+				push_stmt(mes_encoder->line(), mes, mes_addr);
 			if (sub->columns && line.columns > sub->columns)
 				sys_warning("WARNING: Line # %d exceeds configured columns value\n",
 						sub->no);
@@ -431,7 +488,7 @@ bool encode_substitution(struct mes_text_substitution *sub, mes_statement_list *
 				ERROR("Invalid '$' call in string: %s", p);
 			if (p > start)
 				push_string(start, p - start, zenkaku, mes, mes_addr);
-			push_call(i, mes, mes_addr);
+			push_stmt(mes_encoder->call(i), mes, mes_addr);
 			p = endptr + 1;
 		}
 		const char *next;
@@ -480,8 +537,46 @@ static void copy_stmt(mes_statement_list mes, unsigned mes_pos, uint32_t *mes_ad
 	push_stmt(stmt, mes_out, mes_addr);
 }
 
+static void ai5_update_addresses(mes_statement_list mes_out, hashtable_t(addr_table) *table)
+{
+	struct mes_statement *stmt;
+	vector_foreach(stmt, mes_out) {
+		uint32_t *addr;
+		switch (stmt->op) {
+		case MES_STMT_JZ: addr = &stmt->JZ.addr; break;
+		case MES_STMT_JMP: addr = &stmt->JMP.addr; break;
+		case MES_STMT_DEF_MENU: addr = &stmt->DEF_MENU.skip_addr; break;
+		case MES_STMT_DEF_PROC: addr = &stmt->DEF_PROC.skip_addr; break;
+		default: continue;
+		}
+		// replace old address with new address
+		*addr = addr_table_get(table, *addr);
+	}
+}
+
+static void aiw_update_addresses(mes_statement_list mes_out, hashtable_t(addr_table) *table)
+{
+	struct mes_statement *stmt;
+	vector_foreach(stmt, mes_out) {
+		uint32_t *addr;
+		switch (stmt->aiw_op) {
+		case AIW_MES_STMT_JZ: addr = &stmt->JZ.addr; break;
+		case AIW_MES_STMT_JMP: addr = &stmt->JMP.addr; break;
+		case AIW_MES_STMT_DEF_PROC: addr = &stmt->DEF_PROC.skip_addr; break;
+		default: continue;
+		}
+		// replace old address with new address
+		*addr = addr_table_get(table, *addr);
+	}
+}
+
 mes_statement_list mes_substitute_text(mes_statement_list mes, mes_text_sub_list subs_in)
 {
+	if (game_is_aiwin())
+		mes_encoder = &aiw_encoder;
+	else
+		mes_encoder = &ai5_encoder;
+
 	// create list of text positions
 	text_pos_list text_locs = vector_initializer;
 	mes_statement_list_foreach_text(mes, -1, push_text_pos, NULL, &text_locs);
@@ -535,19 +630,10 @@ mes_statement_list mes_substitute_text(mes_statement_list mes, mes_text_sub_list
 	}
 
 	// update jump target addresses
-	struct mes_statement *stmt;
-	vector_foreach(stmt, mes_out) {
-		uint32_t *addr;
-		switch (stmt->op) {
-		case MES_STMT_JZ:    addr = &stmt->JZ.addr; break;
-		case MES_STMT_JMP:   addr = &stmt->JMP.addr; break;
-		case MES_STMT_DEF_MENU: addr = &stmt->DEF_MENU.skip_addr; break;
-		case MES_STMT_DEF_PROC: addr = &stmt->DEF_PROC.skip_addr; break;
-		default: continue;
-		}
-		// replace old address with new address
-		*addr = addr_table_get(&table, *addr);
-	}
+	if (game_is_aiwin())
+		aiw_update_addresses(mes_out, &table);
+	else
+		ai5_update_addresses(mes_out, &table);
 
 	struct text_pos *loc;
 	vector_foreach_p(loc, text_locs) {
