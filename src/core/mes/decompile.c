@@ -20,10 +20,80 @@
 #include "nulib/hashset.h"
 #include "nulib/hashtable.h"
 #include "nulib/vector.h"
+#include "ai5/game.h"
 #include "mes.h"
 
 #define DECOMPILER_WARNING(fmt, ...) \
 	sys_warning("*WARNING*: " fmt "\n", ##__VA_ARGS__)
+
+enum virtual_op {
+	VOP_END,
+	VOP_JZ,
+	VOP_JMP,
+	VOP_DEF_PROC,
+	VOP_DEF_MENU, // AI5 only
+	VOP_OTHER,
+};
+
+static enum virtual_op ai5_vop(struct mes_statement *stmt)
+{
+	switch (stmt->op) {
+	case MES_STMT_END: return VOP_END;
+	case MES_STMT_JZ: return VOP_JZ;
+	case MES_STMT_JMP: return VOP_JMP;
+	case MES_STMT_DEF_PROC: return VOP_DEF_PROC;
+	case MES_STMT_DEF_MENU: return VOP_DEF_MENU;
+	default: return VOP_OTHER;
+	}
+}
+
+static enum virtual_op aiw_vop(struct mes_statement *stmt)
+{
+	switch (stmt->aiw_op) {
+	case AIW_MES_STMT_END: return VOP_END;
+	case AIW_MES_STMT_JZ: return VOP_JZ;
+	case AIW_MES_STMT_JMP: return VOP_JMP;
+	case AIW_MES_STMT_DEF_PROC: return VOP_DEF_PROC;
+	default: return VOP_OTHER;
+	}
+}
+
+static int ai5_vop_to_op(enum virtual_op op)
+{
+	switch (op) {
+	case VOP_END: return MES_STMT_END;
+	case VOP_JZ: return MES_STMT_JZ;
+	case VOP_JMP: return MES_STMT_JMP;
+	case VOP_DEF_PROC: return MES_STMT_DEF_PROC;
+	case VOP_DEF_MENU: return MES_STMT_DEF_MENU;
+	default: ERROR("cannot convert virtual op: %d", op);
+	}
+}
+
+static int aiw_vop_to_op(enum virtual_op op)
+{
+	switch (op) {
+	case VOP_END: return AIW_MES_STMT_END;
+	case VOP_JZ: return AIW_MES_STMT_JZ;
+	case VOP_JMP: return AIW_MES_STMT_JMP;
+	case VOP_DEF_PROC: return AIW_MES_STMT_DEF_PROC;
+	default: ERROR("cannot convert virtual op: %d", op);
+	}
+}
+
+static enum virtual_op (*vop)(struct mes_statement*) = ai5_vop;
+static int (*vop_to_op)(enum virtual_op) = ai5_vop_to_op;
+
+static void vop_init(void)
+{
+	if (game_is_aiwin()) {
+		vop = aiw_vop;
+		vop_to_op = aiw_vop_to_op;
+	} else {
+		vop = ai5_vop;
+		vop_to_op = ai5_vop_to_op;
+	}
+}
 
 // Phase 1: CFG {{{
 // CFG create compound blocks {{{
@@ -46,7 +116,7 @@ static struct mes_block *make_basic_block(mes_statement_list statements, struct 
 
 static struct mes_block *make_compound_block(struct mes_statement *head)
 {
-	assert(head->op == MES_STMT_DEF_MENU || head->op == MES_STMT_DEF_PROC);
+	assert(vop(head) == VOP_DEF_MENU || vop(head) == VOP_DEF_PROC);
 	struct mes_block *block = xcalloc(1, sizeof(struct mes_block));
 	block->type = MES_BLOCK_COMPOUND;
 	block->post = -1;
@@ -54,7 +124,7 @@ static struct mes_block *make_compound_block(struct mes_statement *head)
 	block->compound.head = head;
 	vector_init(block->compound.blocks);
 
-	if (head->op == MES_STMT_DEF_MENU) {
+	if (vop(head) == VOP_DEF_MENU) {
 		block->compound.end_address = head->DEF_MENU.skip_addr - 1;
 	} else {
 		block->compound.end_address = head->DEF_PROC.skip_addr - 1;
@@ -98,7 +168,7 @@ static void cfg_create_compound_blocks(struct mes_block *toplevel, mes_statement
 	vector_init(current);
 
 	toplevel->compound.end_address = vector_A(statements, vector_length(statements)-1)->address;
-	if (unlikely(vector_A(statements, vector_length(statements)-1)->op != MES_STMT_END))
+	if (unlikely(vop(vector_A(statements, vector_length(statements)-1)) != VOP_END))
 ERROR("mes file is not terminated by END statement");
 
 	struct mes_statement *stmt;
@@ -106,14 +176,14 @@ ERROR("mes file is not terminated by END statement");
 		assert(stack_ptr > 0);
 		// end of container block: push statements and pop block stack
 		if (stmt->address == stack[stack_ptr-1]->compound.end_address) {
-			if (unlikely(stmt->op != MES_STMT_END))
+			if (unlikely(vop(stmt) != VOP_END))
 				ERROR("expected END statement at %08x", stmt->address);
 			--stack_ptr;
 			vector_push(struct mes_statement*, current, stmt);
 			push_statements(&current, stack[stack_ptr]);
 		}
 		// start of container block: push statements then push new block to stack
-		else if (stmt->op == MES_STMT_DEF_MENU || stmt->op == MES_STMT_DEF_PROC) {
+		else if (vop(stmt) == VOP_DEF_MENU || vop(stmt) == VOP_DEF_PROC) {
 			push_statements(&current, stack[stack_ptr-1]);
 			struct mes_block *new_block = make_compound_block(stmt);
 			add_child_block(stack[stack_ptr-1], new_block);
@@ -140,7 +210,7 @@ ERROR("mes file is not terminated by END statement");
  * statements with no internal control flow). This is pass 2 of the CFG construction
  * process.
  */
-void cfg_statements_to_basic_blocks(mes_statement_list statements, struct mes_block *parent)
+static void cfg_statements_to_basic_blocks(mes_statement_list statements, struct mes_block *parent)
 {
 	mes_statement_list current;
 	vector_init(current);
@@ -152,7 +222,7 @@ void cfg_statements_to_basic_blocks(mes_statement_list statements, struct mes_bl
 			add_child_block(parent, make_basic_block(current, NULL));
 			vector_init(current);
 		}
-		if (stmt->op == MES_STMT_JZ || stmt->op == MES_STMT_JMP || stmt->op == MES_STMT_END) {
+		if (vop(stmt) == VOP_JZ || vop(stmt) == VOP_JMP || vop(stmt) == VOP_END) {
 			// control flow: new basic block with statement as outgoing edge
 			struct mes_block *new_block = make_basic_block(current, stmt);
 			add_child_block(parent, new_block);
@@ -253,16 +323,16 @@ static void cfg_create_edges(struct mes_compound_block *parent, hashtable_t(bloc
 			vector_A(parent->blocks, i + 1) : NULL;
 		if (block->type == MES_BLOCK_BASIC) {
 			struct mes_statement *end = block->basic.end;
-			if (end && end->op == MES_STMT_JZ) {
+			if (end && vop(end) == VOP_JZ) {
 				block->basic.fallthrough = next;
 				if (next)
 					cfg_create_edge(block, next);
 				block->basic.jump_target = block_table_get(table, end->JZ.addr);
 				cfg_create_edge(block, block->basic.jump_target);
-			} else if (end && end->op == MES_STMT_JMP) {
+			} else if (end && vop(end) == VOP_JMP) {
 				block->basic.jump_target = block_table_get(table, end->JMP.addr);
 				cfg_create_edge(block, block->basic.jump_target);
-			} else if (end && end->op == MES_STMT_END) {
+			} else if (end && vop(end) == VOP_END) {
 				// nothing (terminal block)
 			} else {
 				block->basic.fallthrough = next;
@@ -410,13 +480,13 @@ static void cfg_dom(struct mes_compound_block *compound)
 	}
 
 	/*
-	if (!compound->head || compound->head->op != MES_STMT_DEF_PROC || compound->head->DEF_PROC.no_expr->arg8 != 4)
+	if (!compound->head || vop(compound->head) != VOP_DEF_PROC || compound->head->DEF_PROC.no_expr->arg8 != 4)
 		goto end;
 	if (!compound->head) {
 		NOTICE("toplevel:");
-	} else if (compound->head->op == MES_STMT_DEF_PROC) {
+	} else if (vop(compound->head) == VOP_DEF_PROC) {
 		NOTICE("procedure %d:", compound->head->DEF_PROC.no_expr->arg8);
-	} else if (compound->head->op == MES_STMT_DEF_MENU) {
+	} else if (vop(compound->head) == VOP_DEF_MENU) {
 		NOTICE("menu entry:");
 	}
 	vector_foreach(b, compound->post) {
@@ -456,9 +526,9 @@ end:
 static void check_jump(struct mes_statement *stmt, struct mes_block *parent)
 {
 	uint32_t addr;
-	if (stmt->op == MES_STMT_JZ) {
+	if (vop(stmt) == VOP_JZ) {
 		addr = stmt->JZ.addr;
-	} else if (stmt->op == MES_STMT_JMP) {
+	} else if (vop(stmt) == VOP_JMP) {
 		addr = stmt->JMP.addr;
 	} else {
 		return;
@@ -620,7 +690,7 @@ static struct mes_block *converge_point(struct mes_block *a, struct mes_block *b
 	return converge;
 }
 
-void ast_create_block(mes_ast_block *block, struct mes_block *parent, struct mes_block *head);
+static void ast_create_block(mes_ast_block *block, struct mes_block *parent, struct mes_block *head);
 
 static struct mes_block *ast_create_node(mes_ast_block *ast_block, struct mes_block *parent,
 		struct mes_block *head, mes_block_list frontier)
@@ -633,7 +703,7 @@ static struct mes_block *ast_create_node(mes_ast_block *ast_block, struct mes_bl
 	// compound block
 	if (head->type == MES_BLOCK_COMPOUND) {
 		mes_ast_block *body;
-		if (head->compound.head->op == MES_STMT_DEF_PROC) {
+		if (vop(head->compound.head) == VOP_DEF_PROC) {
 			// procedure definition
 			struct mes_ast *node = make_ast_node(MES_AST_PROCEDURE, head->address);
 			node->proc.num_expr = head->compound.head->DEF_PROC.no_expr;
@@ -641,7 +711,7 @@ static struct mes_block *ast_create_node(mes_ast_block *ast_block, struct mes_bl
 			body = &node->proc.body;
 		} else {
 			// menu entry definition
-			assert(head->compound.head->op == MES_STMT_DEF_MENU);
+			assert(vop(head->compound.head) == VOP_DEF_MENU);
 			struct mes_ast *node = make_ast_node(MES_AST_MENU_ENTRY, head->address);
 			node->menu.params = head->compound.head->DEF_MENU.params;
 			vector_push(struct mes_ast*, *ast_block, node);
@@ -668,7 +738,7 @@ static struct mes_block *ast_create_node(mes_ast_block *ast_block, struct mes_bl
 		//      remove all of these jumps as redundant.
 		if (basic->fallthrough) {
 			basic->end = xcalloc(1, sizeof(struct mes_statement));
-			basic->end->op = MES_STMT_JMP;
+			basic->end->op = vop_to_op(VOP_JMP);
 			basic->end->address = MES_ADDRESS_SYNTHETIC;
 			basic->end->JMP.addr = basic->fallthrough->address;
 			struct mes_ast *node = make_ast_node(MES_AST_STATEMENTS, basic->end->address);
@@ -676,7 +746,7 @@ static struct mes_block *ast_create_node(mes_ast_block *ast_block, struct mes_bl
 			vector_push(struct mes_ast*, *ast_block, node);
 		}
 		return basic->fallthrough;
-	} else if (basic->end->op == MES_STMT_JZ) {
+	} else if (vop(basic->end) == VOP_JZ) {
 		assert(basic->jump_target && basic->fallthrough);
 		if (block_list_contains(head->dom_front, head)) {
 			// while loop
@@ -707,7 +777,7 @@ static struct mes_block *ast_create_node(mes_ast_block *ast_block, struct mes_bl
 			ast_create_block(&node->cond.alternative, parent, basic->jump_target);
 			return converge_point(basic->fallthrough, basic->jump_target, frontier);
 		}
-	} else if (basic->end->op == MES_STMT_JMP || basic->end->op == MES_STMT_END) {
+	} else if (vop(basic->end) == VOP_JMP || vop(basic->end) == VOP_END) {
 		// goto or return: just put the original statement back into the AST
 		// (they will be cleaned up later during simplification)
 		struct mes_ast *node = make_ast_node(MES_AST_STATEMENTS, basic->end->address);
@@ -727,7 +797,7 @@ static void _ast_create_block(mes_ast_block *block, struct mes_block *parent,
 	} while (head && !block_list_contains(frontier, head));
 }
 
-void ast_create_block(mes_ast_block *block, struct mes_block *parent, struct mes_block *head)
+static void ast_create_block(mes_ast_block *block, struct mes_block *parent, struct mes_block *head)
 {
 	_ast_create_block(block, parent, head, head->dom_front);
 
@@ -802,9 +872,9 @@ static void ast_node_simplify(hashtable_t(ast_table) *table, struct mes_ast *nod
 	case MES_AST_STATEMENTS:
 		assert(!vector_empty(node->statements));
 		stmt = vector_A(node->statements, vector_length(node->statements) - 1);
-		if (stmt->op == MES_STMT_JMP) {
+		if (vop(stmt) == VOP_JMP) {
 			ast_simplify_jmp(table, node, stmt, continuation, loop_head, loop_break);
-		} else if (stmt->op == MES_STMT_END && !continuation) {
+		} else if (vop(stmt) == VOP_END && !continuation) {
 			// return with no continuation: eliminiate END instruction
 			vector_length(node->statements)--;
 			mes_statement_free(stmt);
@@ -941,6 +1011,7 @@ static void leak_check(struct mes_compound_block *block, int indent)
 
 bool mes_decompile(uint8_t *data, size_t data_size, mes_ast_block *out)
 {
+	vop_init();
 	struct mes_block cfg_toplevel = { .type = MES_BLOCK_COMPOUND };
 	mes_ast_block ast_toplevel = vector_initializer;
 
@@ -997,6 +1068,7 @@ void mes_block_list_free(mes_block_list list)
 
 bool mes_decompile_debug(uint8_t *data, size_t data_size, mes_block_list *out)
 {
+	vop_init();
 	struct mes_block cfg_toplevel = { .type = MES_BLOCK_COMPOUND };
 
 	mes_statement_list statements = vector_initializer;

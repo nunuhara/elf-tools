@@ -300,7 +300,10 @@ static void mes_ast_statement_list_print_text(string text, struct mes_statement 
 static void mes_ast_statement_list_print_stmt(struct mes_statement *stmt, void *_data)
 {
 	struct statement_list_print_data *data = _data;
-	_mes_statement_print(stmt, data->out, data->indent);
+	if (game_is_aiwin())
+		_aiw_mes_statement_print(stmt, data->out, data->indent);
+	else
+		_mes_statement_print(stmt, data->out, data->indent);
 }
 
 static void mes_ast_statement_list_print(mes_statement_list statements, int name_function,
