@@ -14,11 +14,12 @@
  * along with this program; if not, see <http://gnu.org/licenses/>.
  */
 
+#include <string.h>
 #include "nulib.h"
 
 #include "mes.h"
 
-// {{{ statements
+// {{{ AI5WIN statements
 
 struct mes_statement *mes_stmt(enum mes_statement_op op)
 {
@@ -242,7 +243,182 @@ struct mes_statement *mes_stmt_menus(void)
 	return stmt;
 }
 
-// }}} statements
+// }}} AI5WIN statements
+// {{{ AIWIN statements
+
+struct mes_statement *aiw_mes_stmt(enum aiw_mes_statement_op op)
+{
+	struct mes_statement *stmt = xcalloc(1, sizeof(struct mes_statement));
+	stmt->aiw_op = op;
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_0xfe(void)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_FE);
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_end(void)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_END);
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_set_flag(struct mes_expression *var, mes_expression_list vals)
+{
+	struct mes_statement *stmt;
+	if (var->aiw_op == AIW_MES_EXPR_IMM) {
+		stmt = aiw_mes_stmt(AIW_MES_STMT_SET_FLAG_CONST);
+		stmt->SET_VAR_CONST.var_no = var->arg8;
+		stmt->SET_VAR_CONST.val_exprs = vals;
+		mes_expression_free(var);
+	} else if (var->aiw_op == AIW_MES_EXPR_IMM16) {
+		stmt = aiw_mes_stmt(AIW_MES_STMT_SET_FLAG_CONST);
+		stmt->SET_VAR_CONST.var_no = var->arg16;
+		stmt->SET_VAR_CONST.val_exprs = vals;
+		mes_expression_free(var);
+	} else {
+		stmt = aiw_mes_stmt(AIW_MES_STMT_SET_FLAG_EXPR);
+		stmt->SET_VAR_EXPR.var_expr = var;
+		stmt->SET_VAR_EXPR.val_exprs = vals;
+	}
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_set_var16(struct mes_expression *var, mes_expression_list vals)
+{
+	struct mes_statement *stmt;
+	if (var->aiw_op == AIW_MES_EXPR_IMM) {
+		stmt = aiw_mes_stmt(AIW_MES_STMT_SET_VAR16_CONST);
+		stmt->SET_VAR_CONST.var_no = var->arg8;
+		stmt->SET_VAR_CONST.val_exprs = vals;
+		mes_expression_free(var);
+	} else if (var->aiw_op == AIW_MES_EXPR_IMM16) {
+		stmt = aiw_mes_stmt(AIW_MES_STMT_SET_VAR16_CONST);
+		stmt->SET_VAR_CONST.var_no = var->arg16;
+		stmt->SET_VAR_CONST.val_exprs = vals;
+		mes_expression_free(var);
+	} else {
+		stmt = aiw_mes_stmt(AIW_MES_STMT_SET_VAR16_EXPR);
+		stmt->SET_VAR_EXPR.var_expr = var;
+		stmt->SET_VAR_EXPR.val_exprs = vals;
+	}
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_set_sysvar(struct mes_expression *var, mes_expression_list vals)
+{
+	struct mes_statement *stmt;
+	if (var->aiw_op == AIW_MES_EXPR_IMM) {
+		stmt = aiw_mes_stmt(AIW_MES_STMT_SET_SYSVAR_CONST);
+		stmt->SET_VAR_CONST.var_no = var->arg8;
+		stmt->SET_VAR_CONST.val_exprs = vals;
+		mes_expression_free(var);
+	} else if (var->aiw_op == AIW_MES_EXPR_IMM16) {
+		stmt = aiw_mes_stmt(AIW_MES_STMT_SET_SYSVAR_CONST);
+		stmt->SET_VAR_CONST.var_no = var->arg16;
+		stmt->SET_VAR_CONST.val_exprs = vals;
+		mes_expression_free(var);
+	} else {
+		stmt = aiw_mes_stmt(AIW_MES_STMT_SET_SYSVAR_EXPR);
+		stmt->SET_VAR_EXPR.var_expr = var;
+		stmt->SET_VAR_EXPR.val_exprs = vals;
+	}
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_set_var32(uint8_t no, struct mes_expression *val)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_SET_VAR32);
+	stmt->SET_VAR_CONST.var_no = no;
+	vector_push(struct mes_expression*, stmt->SET_VAR_CONST.val_exprs, val);
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_ptr_set8(uint8_t no, struct mes_expression *off_expr,
+		mes_expression_list vals)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_PTR_SET8);
+	stmt->PTR_SET.var_no = no;
+	stmt->PTR_SET.off_expr = off_expr;
+	stmt->PTR_SET.val_exprs = vals;
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_ptr_set16(uint8_t no, struct mes_expression *off_expr,
+		mes_expression_list vals)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_PTR_SET16);
+	stmt->PTR_SET.var_no = no;
+	stmt->PTR_SET.off_expr = off_expr;
+	stmt->PTR_SET.val_exprs = vals;
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_jz(struct mes_expression *cond)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_JZ);
+	stmt->JZ.expr = cond;
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_jmp(void)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_JMP);
+	return stmt;
+}
+
+struct mes_statement *_aiw_mes_stmt_call(enum aiw_mes_statement_op op, mes_parameter_list params)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(op);
+	stmt->CALL.params = params;
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_defproc(struct mes_expression *no_expr)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_DEF_PROC);
+	stmt->DEF_PROC.no_expr = no_expr;
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_menuexec(mes_expression_list exprs)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_MENU_EXEC);
+	stmt->AIW_MENU_EXEC.exprs = exprs;
+	return stmt;
+}
+
+struct aiw_mes_menu_case aiw_mes_menu_case(struct mes_expression *expr, mes_statement_list body)
+{
+	return (struct aiw_mes_menu_case){ .cond = expr, .body = body };
+}
+
+struct mes_statement *aiw_mes_stmt_defmenu(struct mes_expression *expr, aiw_menu_table cases)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_DEF_MENU);
+	stmt->AIW_DEF_MENU.expr = expr;
+	stmt->AIW_DEF_MENU.cases = cases;
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_0x35(uint16_t a, uint16_t b)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_35);
+	stmt->AIW_0x35.a = a;
+	stmt->AIW_0x35.b = b;
+	return stmt;
+}
+
+struct mes_statement *aiw_mes_stmt_0x37(uint32_t i)
+{
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_37);
+	stmt->JMP.addr = i;
+	return stmt;
+}
+
+// }}} AIWIN statements
 // {{{ expressions
 
 struct mes_expression *mes_expr(enum mes_expression_op op)
@@ -356,7 +532,96 @@ struct mes_expression *mes_binary_expr(enum mes_expression_op op, struct mes_exp
 	return expr;
 }
 
-// }}} expressions
+// }}} AI5WIN expressions
+// {{{ AIWIN expressions
+
+struct mes_expression *aiw_mes_expr(enum aiw_mes_expression_op op)
+{
+	struct mes_expression *expr = xcalloc(1, sizeof(struct mes_expression));
+	expr->aiw_op = op;
+	return expr;
+}
+
+struct mes_expression *aiw_mes_expr_var4(struct mes_expression *index)
+{
+	if (index->aiw_op == AIW_MES_EXPR_IMM) {
+		struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_FLAG_CONST);
+		expr->arg16 = index->arg8;
+		free(index);
+		return expr;
+	}
+	if (index->op == MES_EXPR_IMM16) {
+		struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_FLAG_CONST);
+		expr->arg16 = index->arg16;
+		free(index);
+		return expr;
+	}
+	struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_FLAG_EXPR);
+	expr->sub_a = index;
+	return expr;
+}
+
+struct mes_expression *aiw_mes_expr_var16(struct mes_expression *index)
+{
+	if (index->aiw_op == AIW_MES_EXPR_IMM) {
+		struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_VAR16_CONST);
+		expr->arg16 = index->arg8;
+		free(index);
+		return expr;
+	}
+	if (index->op == MES_EXPR_IMM16) {
+		struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_VAR16_CONST);
+		expr->arg16 = index->arg16;
+		free(index);
+		return expr;
+	}
+	struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_VAR16_EXPR);
+	expr->sub_a = index;
+	return expr;
+}
+
+struct mes_expression *aiw_mes_expr_sysvar(struct mes_expression *index)
+{
+	if (index->aiw_op == AIW_MES_EXPR_IMM) {
+		struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_SYSVAR_CONST);
+		expr->arg16 = index->arg8;
+		mes_expression_free(index);
+		return expr;
+	}
+	if (index->op == MES_EXPR_IMM16) {
+		struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_SYSVAR_CONST);
+		expr->arg16 = index->arg16;
+		mes_expression_free(index);
+		return expr;
+	}
+	struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_SYSVAR_EXPR);
+	expr->sub_a = index;
+	return expr;
+}
+
+struct mes_expression *aiw_mes_expr_var32(uint8_t no)
+{
+	struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_VAR32);
+	expr->arg8 = no;
+	return expr;
+}
+
+struct mes_expression *aiw_mes_expr_ptr_get8(uint8_t no, struct mes_expression *off_expr)
+{
+	struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_PTR_GET8);
+	expr->arg8 = no;
+	expr->sub_a = off_expr;
+	return expr;
+}
+
+struct mes_expression *aiw_mes_expr_random(uint16_t limit)
+{
+	struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_RAND);
+	expr->arg16 = limit;
+	return expr;
+}
+
+// }}}
 // {{{ parameters
 
 struct mes_parameter mes_param_str(string text)

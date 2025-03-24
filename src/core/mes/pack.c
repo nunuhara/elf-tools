@@ -25,7 +25,7 @@
 
 #include "mes.h"
 
-void pack_string(struct buffer *mes, const string text, bool terminated)
+void pack_string(struct buffer *mes, const string text, bool terminated, uint8_t term)
 {
 	const char *p = text;
 	while (*p) {
@@ -74,7 +74,7 @@ void pack_string(struct buffer *mes, const string text, bool terminated)
 		}
 	}
 	if (terminated)
-		buffer_write_u8(mes, 0);
+		buffer_write_u8(mes, term);
 }
 
 static void _pack_expression(struct buffer *mes, struct mes_expression *expr)
@@ -173,7 +173,7 @@ static void pack_parameter_list(struct buffer *mes, mes_parameter_list params)
 	vector_foreach_p(param, params) {
 		buffer_write_u8(mes, param->type);
 		if (param->type == MES_PARAM_STRING) {
-			pack_string(mes, param->str, true);
+			pack_string(mes, param->str, true, 0);
 		} else {
 			pack_expression(mes, param->expr);
 		}
@@ -190,12 +190,12 @@ static void pack_statement(struct buffer *mes, struct mes_statement *stmt)
 	case MES_STMT_ZENKAKU:
 		if (stmt->TXT.unprefixed)
 			mes->index--;
-		pack_string(mes, stmt->TXT.text, stmt->TXT.terminated);
+		pack_string(mes, stmt->TXT.text, stmt->TXT.terminated, 0);
 		break;
 	case MES_STMT_HANKAKU:
 		if (stmt->TXT.unprefixed)
 			mes->index--;
-		pack_string(mes, stmt->TXT.text, stmt->TXT.terminated);
+		pack_string(mes, stmt->TXT.text, stmt->TXT.terminated, 0);
 		break;
 	case MES_STMT_SET_FLAG_CONST:
 		buffer_write_u16(mes, stmt->SET_VAR_CONST.var_no);
@@ -252,16 +252,271 @@ static void pack_statement(struct buffer *mes, struct mes_statement *stmt)
 	}
 }
 
+static void aiw_pack_statement(struct buffer *mes, struct mes_statement *stmt);
+
 uint8_t *mes_pack(mes_statement_list stmts, size_t *size_out)
 {
+	void (*pack)(struct buffer*,struct mes_statement*) = game_is_aiwin()
+		? aiw_pack_statement
+		: pack_statement;
 	struct buffer mes;
 	buffer_init(&mes, NULL, 0);
 
 	struct mes_statement *stmt;
 	vector_foreach(stmt, stmts) {
-		pack_statement(&mes, stmt);
+		pack(&mes, stmt);
+	}
+
+	if (ai5_target_game == GAME_KAWARAZAKIKE) {
+		// addr table
+		// TODO: test if this actually works in-game
+		// FIXME: avoid extra allocation/copy
+		uint8_t *out = xmalloc(mes.index + 4);
+		le_put32(out, 0, 0);
+		memcpy(out + 4, mes.buf, mes.index);
+		free(mes.buf);
+		*size_out = mes.index + 4;
+		return out;
 	}
 
 	*size_out = mes.index;
 	return mes.buf;
+}
+
+static uint8_t aiw_mes_expr_opcode(enum aiw_mes_expression_op op)
+{
+	return op;
+}
+
+static void _aiw_pack_expression(struct buffer *mes, struct mes_expression *expr)
+{
+	if (expr->sub_b)
+		_aiw_pack_expression(mes, expr->sub_b);
+	if (expr->sub_a)
+		_aiw_pack_expression(mes, expr->sub_a);
+
+	buffer_write_u8(mes, aiw_mes_expr_opcode(expr->aiw_op));
+	switch (expr->aiw_op) {
+	case AIW_MES_EXPR_IMM:
+		mes->index--;
+		buffer_write_u8(mes, expr->arg8);
+		break;
+	case AIW_MES_EXPR_VAR32:
+		mes->index--;
+		buffer_write_u8(mes, expr->arg8 + 0x80);
+		break;
+	case AIW_MES_EXPR_PTR_GET8:
+		mes->index--;
+		buffer_write_u8(mes, expr->arg8 + 0xa0);
+		break;
+	case AIW_MES_EXPR_RAND:
+	case AIW_MES_EXPR_IMM16:
+	case AIW_MES_EXPR_GET_FLAG_CONST:
+	case AIW_MES_EXPR_GET_VAR16_CONST:
+	case AIW_MES_EXPR_GET_SYSVAR_CONST:
+		buffer_write_u16(mes, expr->arg16);
+		break;
+	case AIW_MES_EXPR_IMM32:
+		buffer_write_u32(mes, expr->arg32);
+		break;
+	case AIW_MES_EXPR_PLUS:
+	case AIW_MES_EXPR_MINUS:
+	case AIW_MES_EXPR_MUL:
+	case AIW_MES_EXPR_DIV:
+	case AIW_MES_EXPR_MOD:
+	case AIW_MES_EXPR_AND:
+	case AIW_MES_EXPR_OR:
+	case AIW_MES_EXPR_BITAND:
+	case AIW_MES_EXPR_BITIOR:
+	case AIW_MES_EXPR_BITXOR:
+	case AIW_MES_EXPR_LT:
+	case AIW_MES_EXPR_GT:
+	case AIW_MES_EXPR_LTE:
+	case AIW_MES_EXPR_GTE:
+	case AIW_MES_EXPR_EQ:
+	case AIW_MES_EXPR_NEQ:
+	case AIW_MES_EXPR_GET_FLAG_EXPR:
+	case AIW_MES_EXPR_GET_VAR16_EXPR:
+	case AIW_MES_EXPR_GET_SYSVAR_EXPR:
+	case AIW_MES_EXPR_END:
+		break;
+	}
+}
+
+static void aiw_pack_expression(struct buffer *mes, struct mes_expression *expr)
+{
+	_aiw_pack_expression(mes, expr);
+	buffer_write_u8(mes, aiw_mes_expr_opcode(AIW_MES_EXPR_END));
+}
+
+static void aiw_pack_expression_list(struct buffer *mes, mes_expression_list exprs)
+{
+	struct mes_expression *expr;
+	vector_foreach(expr, exprs) {
+		aiw_pack_expression(mes, expr);
+	}
+	buffer_write_u8(mes, 0xff);
+}
+
+static void aiw_pack_parameter_list(struct buffer *mes, mes_parameter_list params)
+{
+	if (vector_empty(params)) {
+		buffer_write_u8(mes, 0xff);
+		return;
+	}
+
+	struct mes_parameter *p;
+	vector_foreach_p(p, params) {
+		if (p->type == MES_PARAM_STRING) {
+			buffer_write_u8(mes, 0xf5);
+			pack_string(mes, p->str, true, 0xff);
+		} else {
+			aiw_pack_expression(mes, p->expr);
+		}
+	}
+
+	buffer_write_u8(mes, 0xff);
+}
+
+struct aiw_menu_table_entry {
+	uint32_t cond_addr;
+	uint32_t body_addr;
+};
+
+static void aiw_pack_defmenu(struct buffer *mes, struct mes_statement *stmt)
+{
+	aiw_pack_expression(mes, stmt->AIW_DEF_MENU.expr);
+
+	// table address will be written later
+	size_t table_addr_pos = mes->index;
+	mes->index += 4;
+
+	struct aiw_menu_table_entry *table = xcalloc(vector_length(stmt->AIW_DEF_MENU.cases),
+			sizeof(struct aiw_menu_table_entry));
+
+	// write conditions/bodies, recording addresses in table
+	int i = 0;
+	struct aiw_mes_menu_case *c;
+	vector_foreach_p(c, stmt->AIW_DEF_MENU.cases) {
+		if (c->cond) {
+			table[i].cond_addr = mes->index;
+			aiw_pack_expression(mes, c->cond);
+		}
+		table[i].body_addr = mes->index;
+		struct mes_statement *s;
+		vector_foreach(s, c->body) {
+			aiw_pack_statement(mes, s);
+		}
+		i++;
+	}
+
+	// write table
+	buffer_write_u32_at(mes, table_addr_pos, mes->index);
+	buffer_write_u8(mes, vector_length(stmt->AIW_DEF_MENU.cases));
+	for (int i = 0; i < vector_length(stmt->AIW_DEF_MENU.cases); i++) {
+		buffer_write_u32(mes, table[i].cond_addr);
+		buffer_write_u32(mes, table[i].body_addr);
+	}
+
+	free(table);
+}
+
+static uint8_t aiw_mes_stmt_opcode(enum aiw_mes_statement_op op)
+{
+	return op;
+}
+
+static void aiw_pack_statement(struct buffer *mes, struct mes_statement *stmt)
+{
+	buffer_write_u8(mes, aiw_mes_stmt_opcode(stmt->aiw_op));
+	switch (stmt->aiw_op) {
+	case AIW_MES_STMT_21:
+	case AIW_MES_STMT_FE:
+	case AIW_MES_STMT_END:
+		break;
+	case AIW_MES_STMT_TXT:
+		pack_string(mes, stmt->TXT.text, stmt->TXT.terminated,
+				ai5_target_game == GAME_KAWARAZAKIKE ? 0 : 0xff);
+		break;
+	case AIW_MES_STMT_JMP:
+		buffer_write_u32(mes, stmt->JMP.addr);
+		break;
+	case AIW_MES_STMT_UTIL:
+	case AIW_MES_STMT_JMP_MES:
+	case AIW_MES_STMT_CALL_MES:
+	case AIW_MES_STMT_LOAD:
+	case AIW_MES_STMT_SAVE:
+	case AIW_MES_STMT_CALL_PROC:
+	case AIW_MES_STMT_NUM:
+	case AIW_MES_STMT_SET_TEXT_COLOR:
+	case AIW_MES_STMT_WAIT:
+	case AIW_MES_STMT_LOAD_IMAGE:
+	case AIW_MES_STMT_SURF_COPY:
+	case AIW_MES_STMT_SURF_COPY_MASKED:
+	case AIW_MES_STMT_SURF_SWAP:
+	case AIW_MES_STMT_SURF_FILL:
+	case AIW_MES_STMT_SURF_INVERT:
+	case AIW_MES_STMT_29:
+	case AIW_MES_STMT_SHOW_HIDE:
+	case AIW_MES_STMT_CROSSFADE:
+	case AIW_MES_STMT_CROSSFADE2:
+	case AIW_MES_STMT_CURSOR:
+	case AIW_MES_STMT_ANIM:
+	case AIW_MES_STMT_LOAD_AUDIO:
+	case AIW_MES_STMT_LOAD_EFFECT:
+	case AIW_MES_STMT_LOAD_VOICE:
+	case AIW_MES_STMT_AUDIO:
+	case AIW_MES_STMT_PLAY_MOVIE:
+	case AIW_MES_STMT_34:
+		aiw_pack_parameter_list(mes, stmt->CALL.params);
+		break;
+	case AIW_MES_STMT_SET_FLAG_CONST:
+	case AIW_MES_STMT_SET_VAR16_CONST:
+	case AIW_MES_STMT_SET_SYSVAR_CONST:
+		buffer_write_u16(mes, stmt->SET_VAR_CONST.var_no);
+		aiw_pack_expression_list(mes, stmt->SET_VAR_CONST.val_exprs);
+		break;
+	case AIW_MES_STMT_SET_FLAG_EXPR:
+	case AIW_MES_STMT_SET_VAR16_EXPR:
+	case AIW_MES_STMT_SET_SYSVAR_EXPR:
+		aiw_pack_expression(mes, stmt->SET_VAR_EXPR.var_expr);
+		aiw_pack_expression_list(mes, stmt->SET_VAR_EXPR.val_exprs);
+		break;
+	case AIW_MES_STMT_SET_VAR32:
+		buffer_write_u8(mes, stmt->SET_VAR_CONST.var_no);
+		aiw_pack_expression(mes, vector_A(stmt->SET_VAR_CONST.val_exprs, 0));
+		break;
+	case AIW_MES_STMT_PTR_SET8:
+	case AIW_MES_STMT_PTR_SET16:
+		buffer_write_u8(mes, stmt->PTR_SET.var_no);
+		aiw_pack_expression(mes, stmt->PTR_SET.off_expr);
+		aiw_pack_expression_list(mes, stmt->PTR_SET.val_exprs);
+		break;
+	case AIW_MES_STMT_JZ:
+		aiw_pack_expression(mes, stmt->JZ.expr);
+		buffer_write_u32(mes, stmt->JZ.addr);
+		break;
+	case AIW_MES_STMT_DEF_PROC:
+		aiw_pack_expression(mes, stmt->DEF_PROC.no_expr);
+		buffer_write_u32(mes, stmt->DEF_PROC.skip_addr);
+		break;
+	case AIW_MES_STMT_DEF_MENU:
+		aiw_pack_defmenu(mes, stmt);
+		break;
+	case AIW_MES_STMT_MENU_EXEC:
+		aiw_pack_expression_list(mes, stmt->AIW_MENU_EXEC.exprs);
+		break;
+	case AIW_MES_STMT_COMMIT_MESSAGE:
+		if (ai5_target_game == GAME_KAWARAZAKIKE) {
+			aiw_pack_parameter_list(mes, stmt->CALL.params);
+		}
+		break;
+	case AIW_MES_STMT_35:
+		buffer_write_u16(mes, stmt->AIW_0x35.a);
+		buffer_write_u16(mes, stmt->AIW_0x35.b);
+		break;
+	case AIW_MES_STMT_37:
+		buffer_write_u32(mes, stmt->JMP.addr);
+		break;
+	}
 }

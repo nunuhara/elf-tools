@@ -179,6 +179,34 @@ struct mes_expression *mes_binary_expr(enum mes_expression_op op, struct mes_exp
 struct mes_parameter mes_param_str(string text);
 struct mes_parameter mes_param_expr(struct mes_expression *expr);
 
+struct mes_statement *aiw_mes_stmt(enum aiw_mes_statement_op op);
+struct mes_statement *aiw_mes_stmt_end(void);
+struct mes_statement *aiw_mes_stmt_set_flag(struct mes_expression *var, mes_expression_list vals);
+struct mes_statement *aiw_mes_stmt_set_var16(struct mes_expression *var, mes_expression_list vals);
+struct mes_statement *aiw_mes_stmt_set_sysvar(struct mes_expression *var, mes_expression_list vals);
+struct mes_statement *aiw_mes_stmt_set_var32(uint8_t no, struct mes_expression *val);
+struct mes_statement *aiw_mes_stmt_ptr_set8(uint8_t no, struct mes_expression *off_expr,
+		mes_expression_list vals);
+struct mes_statement *aiw_mes_stmt_ptr_set16(uint8_t no, struct mes_expression *off_expr,
+		mes_expression_list vals);
+struct mes_statement *aiw_mes_stmt_jz(struct mes_expression *cond);
+struct mes_statement *aiw_mes_stmt_jmp(void);
+struct mes_statement *_aiw_mes_stmt_call(enum aiw_mes_statement_op op, mes_parameter_list params);
+struct mes_statement *aiw_mes_stmt_defproc(struct mes_expression *no_expr);
+struct mes_statement *aiw_mes_stmt_menuexec(mes_expression_list exprs);
+struct aiw_mes_menu_case aiw_mes_menu_case(struct mes_expression *expr, mes_statement_list body);
+struct mes_statement *aiw_mes_stmt_defmenu(struct mes_expression *expr, aiw_menu_table cases);
+struct mes_statement *aiw_mes_stmt_0x35(uint16_t a, uint16_t b);
+struct mes_statement *aiw_mes_stmt_0x37(uint32_t i);
+struct mes_statement *aiw_mes_stmt_0xfe(void);
+struct mes_expression *aiw_mes_expr(enum aiw_mes_expression_op op);
+struct mes_expression *aiw_mes_expr_var4(struct mes_expression *index);
+struct mes_expression *aiw_mes_expr_var16(struct mes_expression *index);
+struct mes_expression *aiw_mes_expr_sysvar(struct mes_expression *index);
+struct mes_expression *aiw_mes_expr_var32(uint8_t no);
+struct mes_expression *aiw_mes_expr_ptr_get8(uint8_t no, struct mes_expression *off_expr);
+struct mes_expression *aiw_mes_expr_random(uint16_t limit);
+
 void mes_block_list_free(mes_block_list list);
 void mes_ast_free(struct mes_ast* node);
 void mes_ast_block_free(mes_ast_block block);
@@ -194,6 +222,7 @@ void mes_block_list_print(mes_block_list blocks, struct port *out);
 void mes_block_tree_print(mes_block_list blocks, struct port *out);
 
 uint32_t mes_statement_size(struct mes_statement *stmt);
+uint32_t aiw_mes_statement_size(struct mes_statement *stmt);
 
 mes_statement_list mes_flat_parse(const char *path);
 uint8_t *mes_pack(mes_statement_list stmts, size_t *size_out);

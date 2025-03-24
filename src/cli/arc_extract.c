@@ -70,6 +70,8 @@ static bool extract_mes(struct archive_data *data, const char *output_file)
 	if (!open_output_file(output_file, &out))
 		return false;
 
+	mes_clear_labels();
+
 	if (mes_flat || mes_text) {
 		mes_statement_list statements = vector_initializer;
 		if (!mes_parse_statements(data->data, data->size, &statements)) {
@@ -278,7 +280,7 @@ static bool suffix_equal(const char *str, const char *suffix)
 
 static enum archive_data_type arc_data_type(const char *path)
 {
-	if (suffix_equal(path, "mes.arc"))
+	if (suffix_equal(path, "mes.arc") || suffix_equal(path, "message.arc"))
 		return ARC_MES;
 	if (suffix_equal(path, "data.arc"))
 		return ARC_DATA;
@@ -289,8 +291,13 @@ static enum archive_data_type arc_data_type(const char *path)
 
 bool arc_is_compressed(const char *path)
 {
-	if (ai5_target_game == GAME_ALLSTARS)
+	switch (ai5_target_game) {
+	case GAME_ALLSTARS:
+	case GAME_KAWARAZAKIKE:
 		return false;
+	default:
+		break;
+	}
 
 	enum archive_data_type t = arc_data_type(path);
 	if (t == ARC_PCM)

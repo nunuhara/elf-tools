@@ -22,11 +22,20 @@
 int mf_lex();
 void mf_error(const char *s);
 
+int aiw_mf_lex();
+void aiw_mf_error(const char *s);
+
 extern mes_statement_list mf_parsed_code;
 void mf_push_label(string label, struct mes_statement *stmt);
 void mf_program(mes_statement_list statements);
 uint8_t mf_parse_u8(string str);
+uint16_t mf_parse_u16(string str);
+uint32_t mf_parse_u32(string str);
 mes_statement_list mf_parse_string_literal(string str);
+
+struct mes_statement *aiw_mf_parse_builtin(string name, mes_parameter_list params);
+struct mes_statement *aiw_mf_stmt_call(mes_parameter_list params);
+mes_statement_list aiw_mf_parse_string_literal(string str);
 
 static inline mes_statement_list mf_push_statement(mes_statement_list list,
 		struct mes_statement *stmt)
@@ -72,6 +81,12 @@ static inline mes_qname mf_push_qname_number(mes_qname name, int number)
 	struct mes_qname_part part = { .type = MES_QNAME_NUMBER, .number = number };
 	vector_push(struct mes_qname_part, name, part);
 	return name;
+}
+
+static inline aiw_menu_table mf_push_case(aiw_menu_table table, struct aiw_mes_menu_case c)
+{
+	vector_push(struct aiw_mes_menu_case, table, c);
+	return table;
 }
 
 void mf_push_label_ref(struct mes_statement *stmt, string name);

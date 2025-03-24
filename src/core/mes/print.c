@@ -19,6 +19,7 @@
 #include "nulib.h"
 #include "nulib/port.h"
 #include "nulib/string.h"
+#include "ai5/game.h"
 #include "mes.h"
 
 // text iterator {{{
@@ -35,6 +36,8 @@ static int get_int_parameter(mes_parameter_list params, unsigned i)
 
 static bool stmt_is_normal_text(struct mes_statement *stmt)
 {
+	if (game_is_aiwin())
+		return stmt->aiw_op == AIW_MES_STMT_TXT;
 	return (stmt->op == MES_STMT_ZENKAKU || stmt->op == MES_STMT_HANKAKU)
 		&& stmt->TXT.terminated && !stmt->TXT.unprefixed;
 }

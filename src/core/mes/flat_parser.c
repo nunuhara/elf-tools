@@ -31,14 +31,20 @@
 #include "flat_parser.h"
 
 extern int mf_lineno;
+extern int aiw_mf_lineno;
+
+#define MF_LINENO (game_is_aiwin() ? aiw_mf_lineno : mf_lineno)
 
 #define PARSE_ERROR(fmt, ...) \
-	sys_error("ERROR: At line %d: " fmt "\n", mf_lineno, ##__VA_ARGS__)
+	sys_error("ERROR: At line %d: " fmt "\n", MF_LINENO, ##__VA_ARGS__)
 
 mes_statement_list mf_parsed_code = vector_initializer;
 
 extern FILE *mf_in;
 int mf_parse(void);
+
+extern FILE *aiw_mf_in;
+int aiw_mf_parse(void);
 
 static FILE *open_file(const char *file)
 {
@@ -50,8 +56,31 @@ static FILE *open_file(const char *file)
 	return f;
 }
 
+extern int aiw_mf_debug;
+
+static mes_statement_list aiw_mes_flat_parse(const char *path)
+{
+	//aiw_mf_debug = 1;
+	mf_parsed_code = (mes_statement_list) vector_initializer;
+
+	aiw_mf_in = open_file(path);
+	if (aiw_mf_parse())
+		ERROR("Failed to parse file: %s", path);
+
+	if (aiw_mf_in != stdin)
+		fclose(aiw_mf_in);
+	aiw_mf_in = NULL;
+
+	mes_statement_list r = mf_parsed_code;
+	mf_parsed_code = (mes_statement_list) vector_initializer;
+	return r;
+}
+
 mes_statement_list mes_flat_parse(const char *path)
 {
+	if (game_is_aiwin())
+		return aiw_mes_flat_parse(path);
+
 	mf_parsed_code = (mes_statement_list) vector_initializer;
 
 	mf_in = open_file(path);
@@ -68,6 +97,11 @@ mes_statement_list mes_flat_parse(const char *path)
 }
 
 void mf_error(const char *s)
+{
+	PARSE_ERROR("%s", s);
+}
+
+void aiw_mf_error(const char *s)
 {
 	PARSE_ERROR("%s", s);
 }
@@ -94,6 +128,30 @@ void mf_push_label_ref(struct mes_statement *stmt, string name)
 {
 	struct label_ref ref = { stmt, name };
 	vector_push(struct label_ref, label_refs, ref);
+}
+
+static void aiw_mf_resolve_labels(mes_statement_list statements)
+{
+	struct label_ref ref;
+	vector_foreach(ref, label_refs) {
+		hashtable_iter_t k = hashtable_get(label_table, &labels, ref.name);
+		if (unlikely(k == hashtable_end(&labels)))
+			PARSE_ERROR("Undefined label: %s", ref.name);
+		struct mes_statement *stmt = hashtable_val(&labels, k);
+		switch (ref.stmt->aiw_op) {
+		case AIW_MES_STMT_JZ:
+			ref.stmt->JZ.addr = stmt->address;
+			break;
+		case AIW_MES_STMT_JMP:
+			ref.stmt->JMP.addr = stmt->address;
+			break;
+		case AIW_MES_STMT_DEF_PROC:
+			ref.stmt->DEF_PROC.skip_addr = stmt->address;
+			break;
+		default:
+			ERROR("invalid opcode for label reference: %d", ref.stmt->aiw_op);
+		}
+	}
 }
 
 static void mf_resolve_labels(mes_statement_list statements)
@@ -123,6 +181,16 @@ static void mf_resolve_labels(mes_statement_list statements)
 	}
 }
 
+static void aiw_mf_assign_addresses(mes_statement_list statements)
+{
+	uint32_t ip = 0;
+	struct mes_statement *stmt;
+	vector_foreach(stmt, statements) {
+		stmt->address = ip;
+		ip += aiw_mes_statement_size(stmt);
+	}
+}
+
 static void mf_assign_addresses(mes_statement_list statements)
 {
 	uint32_t ip = 0;
@@ -135,9 +203,81 @@ static void mf_assign_addresses(mes_statement_list statements)
 
 void mf_program(mes_statement_list statements)
 {
-	mf_assign_addresses(statements);
-	mf_resolve_labels(statements);
+	if (game_is_aiwin()) {
+		aiw_mf_assign_addresses(statements);
+		aiw_mf_resolve_labels(statements);
+	} else {
+		mf_assign_addresses(statements);
+		mf_resolve_labels(statements);
+	}
 	mf_parsed_code = statements;
+}
+
+struct aiw_builtin {
+	const char *name;
+	enum aiw_mes_statement_op op;
+};
+
+static struct aiw_builtin aiw_builtins[] = {
+	{ "Util", AIW_MES_STMT_UTIL },
+	{ "load", AIW_MES_STMT_LOAD },
+	{ "save", AIW_MES_STMT_SAVE },
+	{ "display_number", AIW_MES_STMT_NUM },
+	{ "set_text_color", AIW_MES_STMT_SET_TEXT_COLOR },
+	{ "wait", AIW_MES_STMT_WAIT },
+	{ "OP_0x21", AIW_MES_STMT_21 },
+	{ "commit_message", AIW_MES_STMT_COMMIT_MESSAGE },
+	{ "load_image", AIW_MES_STMT_LOAD_IMAGE },
+	{ "surface_copy", AIW_MES_STMT_SURF_COPY },
+	{ "surface_copy_masked", AIW_MES_STMT_SURF_COPY_MASKED },
+	{ "surface_swap", AIW_MES_STMT_SURF_SWAP },
+	{ "surface_fill", AIW_MES_STMT_SURF_FILL },
+	{ "surface_invert", AIW_MES_STMT_SURF_INVERT },
+	{ "OP_0x29", AIW_MES_STMT_29 },
+	{ "show", AIW_MES_STMT_SHOW_HIDE },
+	{ "hide", AIW_MES_STMT_SHOW_HIDE },
+	{ "crossfade", AIW_MES_STMT_CROSSFADE },
+	{ "crossfade2", AIW_MES_STMT_CROSSFADE2 },
+	{ "Cursor", AIW_MES_STMT_CURSOR },
+	{ "Anim", AIW_MES_STMT_ANIM },
+	{ "load_audio", AIW_MES_STMT_LOAD_AUDIO },
+	{ "load_effect", AIW_MES_STMT_LOAD_EFFECT },
+	{ "load_voice", AIW_MES_STMT_LOAD_VOICE },
+	{ "Audio", AIW_MES_STMT_AUDIO },
+	{ "play_movie", AIW_MES_STMT_PLAY_MOVIE },
+	{ "OP_0x34", AIW_MES_STMT_34 },
+};
+
+static enum aiw_mes_statement_op aiw_resolve_builtin(string name)
+{
+	for (int i = 0; i < ARRAY_SIZE(aiw_builtins); i++) {
+		if (!strcmp(name, aiw_builtins[i].name))
+			return aiw_builtins[i].op;
+	}
+	return AIW_MES_STMT_END;
+}
+
+struct mes_statement *aiw_mf_parse_builtin(string name, mes_parameter_list params)
+{
+	enum aiw_mes_statement_op op = aiw_resolve_builtin(name);
+	switch (op) {
+	case AIW_MES_STMT_END:
+		PARSE_ERROR("invalid builtin: %s", name);
+	case AIW_MES_STMT_COMMIT_MESSAGE:
+		if (ai5_target_game == GAME_KAWARAZAKIKE)
+			break;
+		// fallthrough
+	case AIW_MES_STMT_21:
+		if (!vector_empty(params))
+			PARSE_ERROR("builtin '%s' takes no parameters", name);
+		vector_destroy(params);
+		string_free(name);
+		return aiw_mes_stmt(op);
+	default:
+		break;
+	}
+	string_free(name);
+	return _aiw_mes_stmt_call(op, params);
 }
 
 static long parse_int(string str)
@@ -154,6 +294,22 @@ uint8_t mf_parse_u8(string str)
 	long i = parse_int(str);
 	if (i < 0 || i >= 256)
 		PARSE_ERROR("value out of range: %s", str);
+	string_free(str);
+	return i;
+}
+
+uint16_t mf_parse_u16(string str)
+{
+	long i = parse_int(str);
+	if (i < 0 || i >= 65535)
+		PARSE_ERROR("value out of range: %s", str);
+	string_free(str);
+	return i;
+}
+
+uint32_t mf_parse_u32(string str)
+{
+	long i = parse_int(str);
 	string_free(str);
 	return i;
 }
@@ -217,6 +373,24 @@ mes_statement_list mf_parse_string_literal(string str)
 	return stmts;
 }
 
+mes_statement_list aiw_mf_parse_string_literal(string str)
+{
+	mes_statement_list stmts = vector_initializer;
+
+	string sjis = utf8_to_sjis(str);
+	string_free(str);
+
+	const char *p = sjis;
+	while (*p) {
+		struct mes_statement *stmt = read_string_literal(p, &p);
+		stmt->aiw_op = AIW_MES_STMT_TXT;
+		vector_push(struct mes_statement*, stmts, stmt);
+	}
+	string_free(sjis);
+
+	return stmts;
+}
+
 struct mes_statement *mf_stmt_sys_named_var_set(string name, mes_expression_list vals)
 {
 	bool dword;
@@ -274,6 +448,15 @@ struct mes_statement *mf_stmt_call(mes_parameter_list params)
 	if (vector_A(params, 0).type == MES_PARAM_STRING)
 		return mes_stmt_call(params);
 	return mes_stmt_proc(params);
+}
+
+struct mes_statement *aiw_mf_stmt_call(mes_parameter_list params)
+{
+	if (vector_length(params) < 1)
+		PARSE_ERROR("Call with zero parameters");
+	if (vector_A(params, 0).type == MES_PARAM_STRING)
+		return _aiw_mes_stmt_call(AIW_MES_STMT_CALL_MES, params);
+	return _aiw_mes_stmt_call(AIW_MES_STMT_CALL_PROC, params);
 }
 
 struct mes_expression *mf_parse_constant(string text)

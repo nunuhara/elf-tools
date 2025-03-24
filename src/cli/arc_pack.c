@@ -179,10 +179,51 @@ static bool arc_write_kakyuusei(const char *path, arc_file_list files)
 	return true;
 }
 
+static void write_entry_name(struct port *out, struct arc_file *f, struct arc_metadata *meta)
+{
+	uint8_t e_name[256];
+	string name = arc_file_name(f);
+
+	int i;
+	for (i = 0; name[i]; i++) {
+		e_name[i] = name[i] ^ meta->name_key;
+	}
+	for (; i < meta->name_length; i++) {
+		e_name[i] = meta->name_key;
+	}
+	write_bytes(out, e_name, meta->name_length);
+}
+
+static void write_entry_NSO(struct port *out, struct arc_file *f, struct arc_metadata *meta)
+{
+	write_entry_name(out, f, meta);
+	write_u32(out, f->packed_size ^ meta->size_key);
+	write_u32(out, f->packed_offset ^ meta->size_key);
+}
+
+static void write_entry_NOS(struct port *out, struct arc_file *f, struct arc_metadata *meta)
+{
+	write_entry_name(out, f, meta);
+	write_u32(out, f->packed_offset ^ meta->size_key);
+	write_u32(out, f->packed_size ^ meta->size_key);
+}
+
 bool arc_write(const char *path, arc_file_list files, struct arc_metadata *meta)
 {
 	if (ai5_target_game == GAME_KAKYUUSEI)
 		return arc_write_kakyuusei(path, files);
+
+	// determine entry format
+	void (*write_entry)(struct port*,struct arc_file*,struct arc_metadata*);
+	if (meta->name_off == 0 && meta->size_off == meta->name_length
+			&& meta->offset_off == meta->size_off + 4) {
+		write_entry = write_entry_NSO;
+	} else if (meta->name_off == 0 && meta->offset_off == meta->name_length
+			&& meta->size_off == meta->offset_off + 4) {
+		write_entry = write_entry_NOS;
+	} else {
+		sys_error("Unsupported archive entry format");
+	}
 
 	struct port out;
 	if (!port_file_open(&out, path))
@@ -190,38 +231,21 @@ bool arc_write(const char *path, arc_file_list files, struct arc_metadata *meta)
 
 	write_u32(&out, vector_length(files));
 
-	// write index
-	struct arc_file *f;
-	uint8_t *e_name = xmalloc(meta->name_length);
-	vector_foreach_p(f, files) {
-		// write name
-		string name = arc_file_name(f);
-		int i;
-		for (i = 0; name[i]; i++) {
-			e_name[i] = name[i] ^ meta->name_key;
-		}
-		for (; i < meta->name_length; i++) {
-			e_name[i] = meta->name_key;
-		}
-		write_bytes(&out, e_name, meta->name_length);
-		// write dummy size
-		write_u32(&out, 0);
-		// write dummy offset
-		write_u32(&out, 0);
-	}
-	free(e_name);
-
 	// write file data
+	if (!port_seek(&out, 4 + meta->entry_size * vector_length(files)))
+		sys_error("Seek failed: %s", strerror(errno));
+
+	struct arc_file *f;
 	vector_foreach_p(f, files) {
 		arc_file_write(&out, f);
 	}
 
-	// update offset/size fields in index
-	for (int i = 0; i < vector_length(files); i++) {
-		if (!port_seek(&out, 4 + i * (meta->name_length + 8) + meta->name_length))
-			sys_error("Seek failed: %s", strerror(errno));
-		write_u32(&out, vector_A(files, i).packed_size ^ meta->size_key);
-		write_u32(&out, vector_A(files, i).packed_offset ^ meta->offset_key);
+	// write index
+	if (!port_seek(&out, 4))
+		sys_error("Seek failed: %s", strerror(errno));
+
+	vector_foreach_p(f, files) {
+		write_entry(&out, f, meta);
 	}
 
 	port_close(&out);
@@ -242,7 +266,11 @@ static struct arc_file arc_file_fs(string path, string name, bool compress)
 			sys_error("Read failure: %s", strerror(errno));
 
 		size_t size;
-		uint8_t *data = lzss_compress(raw_data, raw_size, &size);
+		uint8_t *data;
+		if (game_is_aiwin())
+			data = lzss_bw_compress(raw_data, raw_size, &size);
+		else
+			data = lzss_compress(raw_data, raw_size, &size);
 		if (!data)
 			sys_error("Compression failure\n");
 
@@ -334,66 +362,86 @@ static void decode_key(const char *key, struct arc_metadata *dst)
 	dst->name_key = name_key;
 }
 
+#define NAME_SIZE_OFFSET(len) \
+	.name_length = len, \
+	.name_off = 0, \
+	.size_off = len, \
+	.offset_off = len + 4, \
+	.entry_size = len + 8
+
+#define NAME_OFFSET_SIZE(len) \
+	.name_length = len, \
+	.name_off = 0, \
+	.offset_off = len, \
+	.size_off = len + 4, \
+	.entry_size = len + 8
+
 static struct arc_metadata game_keys[] = {
 	[GAME_YUKINOJOU] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x87af1f1c,
 		.size_key    = 0xf3107572,
 		.name_key    = 0xfa,
 	},
 	[GAME_YUNO] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x68820811,
 		.size_key    = 0x33656755,
 		.name_key    = 0x03,
 	},
 	[GAME_SHANGRLIA] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x68820811,
 		.size_key    = 0x33656755,
 		.name_key    = 0x03,
 	},
 	[GAME_SHANGRLIA2] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x68820811,
 		.size_key    = 0x33656755,
 		.name_key    = 0x03,
 	},
 	[GAME_BEYOND] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x55aa55aa,
 		.size_key    = 0xaa55aa55,
 		.name_key    = 0x55,
 	},
 	[GAME_AI_SHIMAI] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0xd4c29ff9,
 		.size_key    = 0x13f09573,
 		.name_key    = 0x26,
 	},
 	[GAME_KOIHIME] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x55aa55aa,
 		.size_key    = 0xaa55aa55,
 		.name_key    = 0x55,
 	},
 	[GAME_DOUKYUUSEI] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x55aa55aa,
 		.size_key    = 0xaa55aa55,
 		.name_key    = 0x55,
 	},
 	[GAME_ISAKU] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x55aa55aa,
 		.size_key    = 0xaa55aa55,
 		.name_key    = 0x55,
 	},
 	[GAME_ALLSTARS] = {
-		.name_length = 20,
+		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x44bd44bd,
 		.size_key    = 0xcf88cf88,
 		.name_key    = 0x66,
+	},
+	[GAME_SHUUSAKU] = {
+		NAME_OFFSET_SIZE(16),
+		.offset_key  = 0,
+		.size_key    = 0,
+		.name_key    = 0,
 	},
 };
 

@@ -55,6 +55,9 @@ sources = [
 sources += flexgen.process('src/core/mes/flat_lexer.l')
 sources += bisongen.process('src/core/mes/flat_parser.y')
 
+sources += flexgen.process('src/core/mes/aiw_flat_lexer.l')
+sources += bisongen.process('src/core/mes/aiw_flat_parser.y')
+
 sources += flexgen.process('src/core/arc/manifest_lexer.l')
 sources += bisongen.process('src/core/arc/manifest_parser.y')
 
