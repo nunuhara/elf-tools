@@ -443,6 +443,12 @@ static struct arc_metadata game_keys[] = {
 		.size_key    = 0,
 		.name_key    = 0,
 	},
+	[GAME_KAWARAZAKIKE] = {
+		NAME_OFFSET_SIZE(32),
+		.offset_key  = 0,
+		.size_key    = 0,
+		.name_key    = 0,
+	},
 };
 
 static void set_key_by_game(const char *name, struct arc_metadata *meta)
