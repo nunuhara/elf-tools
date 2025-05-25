@@ -33,7 +33,7 @@ uint16_t mf_parse_u16(string str);
 uint32_t mf_parse_u32(string str);
 mes_statement_list mf_parse_string_literal(string str);
 
-struct mes_statement *aiw_mf_parse_builtin(string name, mes_parameter_list params);
+struct mes_statement *aiw_mf_parse_builtin(mes_qname name, mes_parameter_list params);
 struct mes_statement *aiw_mf_stmt_call(mes_parameter_list params);
 mes_statement_list aiw_mf_parse_string_literal(string str);
 

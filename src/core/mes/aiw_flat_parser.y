@@ -12,6 +12,7 @@
 %union {
     int token;
     string string;
+    mes_qname path;
     struct mes_expression *expression;
     mes_expression_list arguments;
     struct aiw_mes_menu_case menu_case;
@@ -40,6 +41,7 @@
 %type   <parameters>	params param_list
 %type   <expression>	expr primary_expr mul_expr add_expr rel_expr eq_expr bitand_expr
 %type   <expression>	xor_expr bitior_expr and_expr or_expr
+%type   <path>		path
 %type   <menu_case>	case
 %type   <cases>		cases
 
@@ -69,8 +71,6 @@ str
 stmt
 	: IDENTIFIER ':' stmt
 	  { mf_push_label($1, $3); $$ = $3; }
-	| IDENTIFIER params ';'
-	  { $$ = aiw_mf_parse_builtin($1, $2); }
 	| RETURN ';'
 	  { $$ = aiw_mes_stmt_end(); }
 	| VAR4 '[' expr ']' '=' exprs ';'
@@ -105,6 +105,19 @@ stmt
           { $$ = aiw_mes_stmt_0x37(mf_parse_u32($2)); }
         | OP_0xFE ';'
           { $$ = aiw_mes_stmt_0xfe(); }
+	| path params ';'
+	  { $$ = aiw_mf_parse_builtin($1, $2); }
+	;
+
+path
+	: IDENTIFIER
+	  { $$ = mf_push_qname_ident((mes_qname)vector_initializer, $1); }
+	| FUNCTION '[' I_CONSTANT ']'
+	  { $$ = mf_push_qname_number((mes_qname)vector_initializer, mf_parse_u8($3)); }
+	| path '.' IDENTIFIER
+	  { $$ = mf_push_qname_ident($1, $3); }
+	| path '.' FUNCTION '[' I_CONSTANT ']'
+	  { $$ = mf_push_qname_number($1, mf_parse_u8($5)); }
 	;
 
 cases

@@ -213,70 +213,38 @@ void mf_program(mes_statement_list statements)
 	mf_parsed_code = statements;
 }
 
-struct aiw_builtin {
-	const char *name;
-	enum aiw_mes_statement_op op;
-};
-
-static struct aiw_builtin aiw_builtins[] = {
-	{ "Util", AIW_MES_STMT_UTIL },
-	{ "load", AIW_MES_STMT_LOAD },
-	{ "save", AIW_MES_STMT_SAVE },
-	{ "display_number", AIW_MES_STMT_NUM },
-	{ "set_text_color", AIW_MES_STMT_SET_TEXT_COLOR },
-	{ "wait", AIW_MES_STMT_WAIT },
-	{ "OP_0x21", AIW_MES_STMT_21 },
-	{ "commit_message", AIW_MES_STMT_COMMIT_MESSAGE },
-	{ "load_image", AIW_MES_STMT_LOAD_IMAGE },
-	{ "surface_copy", AIW_MES_STMT_SURF_COPY },
-	{ "surface_copy_masked", AIW_MES_STMT_SURF_COPY_MASKED },
-	{ "surface_swap", AIW_MES_STMT_SURF_SWAP },
-	{ "surface_fill", AIW_MES_STMT_SURF_FILL },
-	{ "surface_invert", AIW_MES_STMT_SURF_INVERT },
-	{ "OP_0x29", AIW_MES_STMT_29 },
-	{ "show", AIW_MES_STMT_SHOW_HIDE },
-	{ "hide", AIW_MES_STMT_SHOW_HIDE },
-	{ "crossfade", AIW_MES_STMT_CROSSFADE },
-	{ "crossfade2", AIW_MES_STMT_CROSSFADE2 },
-	{ "Cursor", AIW_MES_STMT_CURSOR },
-	{ "Anim", AIW_MES_STMT_ANIM },
-	{ "load_audio", AIW_MES_STMT_LOAD_AUDIO },
-	{ "load_effect", AIW_MES_STMT_LOAD_EFFECT },
-	{ "load_voice", AIW_MES_STMT_LOAD_VOICE },
-	{ "Audio", AIW_MES_STMT_AUDIO },
-	{ "play_movie", AIW_MES_STMT_PLAY_MOVIE },
-	{ "OP_0x34", AIW_MES_STMT_34 },
-};
-
-static enum aiw_mes_statement_op aiw_resolve_builtin(string name)
+static mes_parameter_list append_params(mes_parameter_list a, mes_parameter_list b)
 {
-	for (int i = 0; i < ARRAY_SIZE(aiw_builtins); i++) {
-		if (!strcmp(name, aiw_builtins[i].name))
-			return aiw_builtins[i].op;
+	struct mes_parameter *p;
+	vector_foreach_p(p, b) {
+		vector_push(struct mes_parameter, a, *p);
 	}
-	return AIW_MES_STMT_END;
+	return a;
 }
 
-struct mes_statement *aiw_mf_parse_builtin(string name, mes_parameter_list params)
+struct mes_statement *aiw_mf_parse_builtin(mes_qname name, mes_parameter_list _params)
 {
-	enum aiw_mes_statement_op op = aiw_resolve_builtin(name);
+	int op;
+	mes_parameter_list call = mes_resolve_syscall(name, &op);
+	if (op < 0)
+		PARSE_ERROR("Invalid builtin");
+
+	mes_parameter_list params = append_params(call, _params);
+	vector_destroy(_params);
+
 	switch (op) {
-	case AIW_MES_STMT_END:
-		PARSE_ERROR("invalid builtin: %s", name);
 	case AIW_MES_STMT_COMMIT_MESSAGE:
 		if (ai5_target_game == GAME_KAWARAZAKIKE)
 			break;
 		// fallthrough
 	case AIW_MES_STMT_21:
 		if (!vector_empty(params))
-			PARSE_ERROR("builtin '%s' takes no parameters", name);
+			PARSE_ERROR("builtin takes no parameters");
 		vector_destroy(params);
-		string_free(name);
 		return aiw_mes_stmt(op);
 	default:
 		break;
 	}
-	string_free(name);
 	return _aiw_mes_stmt_call(op, params);
 }
 
@@ -406,15 +374,6 @@ struct mes_statement *mf_stmt_sys_named_var_set(string name, mes_expression_list
 	struct mes_expression *e = mes_expr(MES_EXPR_IMM);
 	e->arg8 = i;
 	return dword ? mes_stmt_sys_var32_set(e, vals) : mes_stmt_sys_var16_set(e, vals);
-}
-
-static mes_parameter_list append_params(mes_parameter_list a, mes_parameter_list b)
-{
-	struct mes_parameter *p;
-	vector_foreach_p(p, b) {
-		vector_push(struct mes_parameter, a, *p);
-	}
-	return a;
 }
 
 struct mes_statement *mf_stmt_named_sys(mes_qname name, mes_parameter_list _params)
