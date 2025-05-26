@@ -158,6 +158,44 @@ static void pack_a_compose_args(struct buffer *out, struct anim_compose_args *ca
 		WARNING("Compose call has different coordinate for BG and DST areas");
 }
 
+static uint8_t a8_draw_call_opcode(struct anim_draw_call *call)
+{
+	switch (call->op) {
+	case ANIM_DRAW_OP_COPY: return 0x10 | call->copy.dst.i | (call->copy.src.i << 1);
+	case ANIM_DRAW_OP_COPY_MASKED: return 0x20 | call->copy.dst.i | (call->copy.src.i << 1);
+	case ANIM_DRAW_OP_SWAP: return 0x30 | call->copy.dst.i | (call->copy.src.i << 1);
+	case ANIM_DRAW_OP_FILL: return 0x60 | (call->copy.src.i << 1);
+	default:
+		ERROR("Invalid draw call: %u", call->op);
+	}
+}
+
+static void pack_a8_draw_call(struct buffer *out, struct anim_draw_call *call)
+{
+	size_t start = out->index;
+	buffer_write_u8(out, a8_draw_call_opcode(call));
+	switch (call->op) {
+	case ANIM_DRAW_OP_COPY:
+	case ANIM_DRAW_OP_COPY_MASKED:
+	case ANIM_DRAW_OP_SWAP:
+		pack_a_copy_args(out, &call->copy);
+		break;
+	case ANIM_DRAW_OP_FILL:
+		buffer_write_u16(out, call->fill.dst.x);
+		buffer_write_u16(out, call->fill.dst.y);
+		buffer_write_u16(out, call->fill.dim.w);
+		buffer_write_u16(out, call->fill.dim.h);
+		break;
+	default:
+		ERROR("Invalid draw call: %u", call->op);
+	}
+
+	int rem = (start + anim_draw_call_size) - out->index;
+	for (int i = 0; i < rem; i++) {
+		buffer_write_u8(out, 0);
+	}
+}
+
 static uint8_t a_draw_call_opcode(struct anim_draw_call *call)
 {
 	switch (call->op) {
@@ -251,6 +289,9 @@ static void pack_s4_instruction(struct buffer *out, struct anim_instruction *ins
 	case ANIM_OP_LOOP2_START:
 		buffer_write_u8(out, instr->arg);
 		break;
+	case ANIM_OP_LOAD_PALETTE:
+		buffer_write_u16(out, instr->arg);
+		break;
 	default:
 		break;
 	}
@@ -270,6 +311,9 @@ static void pack_a_instruction(struct buffer *out, struct anim_instruction *inst
 	case ANIM_OP_LOOP2_START:
 		buffer_write_u16(out, instr->arg);
 		break;
+	case ANIM_OP_LOAD_PALETTE:
+		buffer_write_u16(out, instr->arg);
+		break;
 	default:
 		break;
 	}
@@ -282,6 +326,33 @@ static void pack_s4_stream(struct buffer *out, anim_stream stream)
 		pack_s4_instruction(out, p);
 	}
 	buffer_write_u8(out, 0xff);
+}
+
+static int get_palette_no(anim_palette_list palettes, uint16_t id)
+{
+	int i = 0;
+	struct anim_palette *p;
+	vector_foreach_p(p, palettes) {
+		if (p->addr == id)
+			return i;
+		i++;
+	}
+	return -1;
+}
+
+static void pack_a8_stream(struct buffer *out, anim_stream stream, anim_palette_list palettes,
+		uint16_t *pal_addr)
+{
+	struct anim_instruction *p;
+	vector_foreach_p(p, stream) {
+		if (p->op == ANIM_OP_LOAD_PALETTE) {
+			int no = get_palette_no(palettes, p->arg);
+			if (no < 0)
+				ERROR("Invalid palette index: %u", p->arg);
+			p->arg = pal_addr[no];
+		}
+		pack_s4_instruction(out, p);
+	}
 }
 
 static void pack_a_stream(struct buffer *out, anim_stream stream)
@@ -317,6 +388,44 @@ static void anim_pack_s4(struct anim *in, struct buffer *out)
 	buffer_seek(out, end);
 }
 
+static void anim_pack_a8(struct anim *in, struct buffer *out)
+{
+	buffer_write_u8(out, vector_length(in->draw_calls) + vector_length(in->palettes));
+	buffer_seek(out, 1 + 10 * 2);
+
+	struct anim_draw_call *call;
+	vector_foreach_p(call, in->draw_calls) {
+		pack_a8_draw_call(out, call);
+	}
+
+	uint16_t *pal_addr = xcalloc(vector_length(in->palettes), sizeof(uint16_t));
+
+	int no = 0;
+	struct anim_palette *pal;
+	vector_foreach_p(pal, in->palettes) {
+		pal_addr[no++] = out->index;
+		for (int i = 0; i < 256; i++) {
+			buffer_write_u8(out, pal->colors[i].r);
+			buffer_write_u8(out, pal->colors[i].g);
+			buffer_write_u8(out, pal->colors[i].b);
+		}
+	}
+
+	uint16_t stream_addr[10];
+	for (int i = 0; i < 10; i++) {
+		stream_addr[i] = out->index;
+		pack_a8_stream(out, in->streams[i], in->palettes, pal_addr);
+	}
+
+	size_t end = out->index;
+	buffer_seek(out, 1);
+	for (int i = 0; i < 10; i++) {
+		buffer_write_u16(out, stream_addr[i]);
+	}
+	buffer_seek(out, end);
+	free(pal_addr);
+}
+
 static void anim_pack_a(struct anim *in, struct buffer *out)
 {
 	buffer_write_u16(out, vector_length(in->draw_calls));
@@ -348,6 +457,8 @@ uint8_t *anim_pack(struct anim *in, size_t *size_out)
 
 	if (anim_type == ANIM_S4)
 		anim_pack_s4(in, &out);
+	else if (anim_type == ANIM_A8)
+		anim_pack_a8(in, &out);
 	else
 		anim_pack_a(in, &out);
 	*size_out = out.index;

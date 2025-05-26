@@ -240,7 +240,7 @@ static long parse_int(string str)
 	return i;
 }
 
-static unsigned parse_uX(string str, unsigned limit)
+static uint32_t parse_uX(string str, unsigned limit)
 {
 	long i = parse_int(str);
 	if (i < 0 || i > limit)
@@ -308,6 +308,63 @@ static struct anim_color make_color(string r, string g, string b)
 	return c;
 }
 
+static struct anim_color make_packed_color(string str)
+{
+	// parse RRGGBB to integer
+	if (*str != '#')
+		PARSE_ERROR("Invalid color constant: %s", str);
+	char *endptr;
+	long i = strtol(str+1, &endptr, 16);
+	if (*endptr != '\0' || i < 0 || i > 0xffffff)
+		PARSE_ERROR("Invalid color constant: %s", str);
+	string_free(str);
+
+	// unpack integer
+	uint32_t n = i;
+	struct anim_color c = {
+		.r = (n & 0xff0000) >> 16,
+		.g = (n & 0xff00) >> 8,
+		.b = n & 0xff
+	};
+	return c;
+}
+
+static anim_color_list push_color(anim_color_list colors, struct anim_color color)
+{
+	vector_push(struct anim_color, colors, color);
+	return colors;
+}
+
+static void push_palette(struct anim_palette palette)
+{
+	vector_push(struct anim_palette, program.palettes, palette);
+}
+
+static struct anim_palette make_palette(string no, anim_color_list colors)
+{
+	struct anim_palette pal;
+	pal.addr = parse_u16(no);
+
+	int i = 0;
+	struct anim_color *c;
+	vector_foreach_p(c, colors) {
+		if (i > 255) {
+			WARNING("Too many colors in palette %u (%u colors)", pal.addr,
+					(unsigned)vector_length(colors));
+			break;
+		}
+		pal.colors[i].r = c->r;
+		pal.colors[i].g = c->g;
+		pal.colors[i].b = c->b;
+		i++;
+	}
+	if (i != 256)
+		WARNING("Too few colors in palette %u (%d colors)", pal.addr, i);
+
+	vector_destroy(colors);
+	return pal;
+}
+
 %}
 
 %union {
@@ -319,17 +376,20 @@ static struct anim_color make_color(string r, string g, string b)
 	struct anim_target target;
 	struct anim_size size;
 	struct anim_color color;
+	anim_color_list colors;
+	struct anim_palette palette;
 }
 
 %code requires {
 	#include "nulib/string.h"
 	#include "ai5/anim.h"
+	typedef vector_t(struct anim_color) anim_color_list;
 }
 
-%token	<string>	I_CONSTANT
-%token	<token>		ARROW STREAM NOOP CHECK_STOP STALL RESET HALT LOOP_START LOOP_END
-%token	<token>		LOOP2_START LOOP2_END COPY COPY_MASKED SWAP SET_COLOR COMPOSE FILL
-%token	<token>		SET_PALETTE INVALID_TOKEN
+%token	<string>	I_CONSTANT C_CONSTANT
+%token	<token>		ARROW STREAM PALETTE NOOP CHECK_STOP STALL RESET HALT LOOP_START
+%token	<token>		LOOP_END LOOP2_START LOOP2_END LOAD_PALETTE COPY COPY_MASKED SWAP
+%token	<token>		SET_COLOR COMPOSE FILL SET_PALETTE INVALID_TOKEN
 
 %type	<stream>	stream instructions
 %type	<instruction>	instruction
@@ -337,10 +397,26 @@ static struct anim_color make_color(string r, string g, string b)
 %type	<target>	target
 %type	<size>		size
 %type	<color>		color
+%type	<colors>	colors
+%type	<palette>	palette
 
-%start streams
+%start head
 
 %%
+
+head
+	: palettes streams
+	| streams
+	;
+
+palettes
+	: palette { push_palette($1); }
+	| palettes palette { push_palette($2); }
+	;
+
+palette
+	: PALETTE I_CONSTANT '{' colors '}' ';' { $$ = make_palette($2, $4); }
+	;
 
 streams
 	: stream { push_stream($1); }
@@ -375,6 +451,8 @@ instruction
 	{ $$ = make_instruction(ANIM_OP_LOOP2_START, parse_u8($2)); }
 	| LOOP2_END ';'
 	{ $$ = make_instruction(ANIM_OP_LOOP2_END, 0); }
+	| LOAD_PALETTE I_CONSTANT ';'
+	{ $$ = make_instruction(ANIM_OP_LOAD_PALETTE, parse_u16($2)); }
 	| FILL target '@' size ';'
 	{ $$ = make_fill($2, $4); }
 	| copy_fun target ARROW target '@' size ';'
@@ -399,6 +477,11 @@ target
 
 size
 	: '(' I_CONSTANT ',' I_CONSTANT ')' { $$ = make_size($2, $4); }
+	;
+
+colors
+	: C_CONSTANT { $$ = push_color((anim_color_list)vector_initializer, make_packed_color($1)); }
+	| colors C_CONSTANT { $$ = push_color($1, make_packed_color($2)); }
 	;
 
 color

@@ -14,6 +14,8 @@
  * along with this program; if not, see <http://gnu.org/licenses/>.
  */
 
+H [a-fA-F0-9]
+
 %{
 
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -33,34 +35,38 @@
 
 %%
 
-"#".*         { /* line comment */ }
-[ \t\r\n]     { /* whitespace */ }
-":"           { return ':'; }
-";"           { return ';'; }
-","           { return ','; }
-"("           { return '('; }
-")"           { return ')'; }
-"+"           { return '+'; }
-"@"           { return '@'; }
-"->"          { return ARROW; }
-[0-9]+        { RETURN_STRING(I_CONSTANT); }
-"STREAM"      { return STREAM; }
-"NOOP"        { return NOOP; }
-"CHECK_STOP"  { return CHECK_STOP; }
-"STALL"       { return STALL; }
-"RESET"       { return RESET; }
-"HALT"        { return HALT; }
-"LOOP_START"  { return LOOP_START; }
-"LOOP_END"    { return LOOP_END; }
-"LOOP2_START" { return LOOP2_START; }
-"LOOP2_END"   { return LOOP2_END; }
-"COPY"        { return COPY; }
-"COPY_MASKED" { return COPY_MASKED; }
-"SWAP"        { return SWAP; }
-"SET_COLOR"   { return SET_COLOR; }
-"COMPOSE"     { return COMPOSE; }
-"FILL"        { return FILL; }
-"SET_PALETTE" { return SET_PALETTE; }
+[ \t\r\n]          { /* whitespace */ }
+":"                { return ':'; }
+";"                { return ';'; }
+","                { return ','; }
+"("                { return '('; }
+")"                { return ')'; }
+"{"                { return '{'; }
+"}"                { return '}'; }
+"+"                { return '+'; }
+"@"                { return '@'; }
+"->"               { return ARROW; }
+[0-9]+             { RETURN_STRING(I_CONSTANT); }
+"#"{H}{H}{H}{H}{H}{H} { RETURN_STRING(C_CONSTANT); }
+"STREAM"           { return STREAM; }
+"PALETTE"          { return PALETTE; }
+"NOOP"             { return NOOP; }
+"CHECK_STOP"       { return CHECK_STOP; }
+"STALL"            { return STALL; }
+"RESET"            { return RESET; }
+"HALT"             { return HALT; }
+"LOOP_START"       { return LOOP_START; }
+"LOOP_END"         { return LOOP_END; }
+"LOOP2_START"      { return LOOP2_START; }
+"LOOP2_END"        { return LOOP2_END; }
+"LOAD_PALETTE"     { return LOAD_PALETTE; }
+"COPY"             { return COPY; }
+"COPY_MASKED"      { return COPY_MASKED; }
+"SWAP"             { return SWAP; }
+"SET_COLOR"        { return SET_COLOR; }
+"COMPOSE"          { return COMPOSE; }
+"FILL"             { return FILL; }
+"SET_PALETTE"      { return SET_PALETTE; }
 
 . return INVALID_TOKEN;
 
