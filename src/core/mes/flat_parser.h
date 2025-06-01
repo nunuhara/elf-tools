@@ -99,4 +99,7 @@ struct mes_statement *mf_stmt_call(mes_parameter_list params);
 struct mes_expression *mf_parse_constant(string text);
 struct mes_expression *mf_expr_named_sysvar(string name);
 
+struct mes_statement *aiw_mf_stmt_sys_named_var_set(string name, mes_expression_list vals);
+struct mes_expression *aiw_mf_expr_named_sysvar(string name);
+
 #endif // ELF_TOOLS_MES_FLAT_PARSER_H_

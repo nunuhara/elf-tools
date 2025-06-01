@@ -32,7 +32,7 @@
 %token  <token>		AND_OP OR_OP LE_OP GE_OP EQ_OP NE_OP
 %token  <token>		VAR4 VAR16 VAR32 ARROW BYTE WORD DWORD RANDOM JZ GOTO
 %token  <token>		JUMP CALL MENUEXEC FUNCTION RETURN DEFPROC DEFMENU
-%token  <token>		SYSVAR CASE OP_0x35 OP_0x37 OP_0xFE
+%token  <token>		SYSTEM CASE OP_0x35 OP_0x37 OP_0xFE
 
 %type   <program>	stmts str
 %type   <statement>	stmt
@@ -77,8 +77,10 @@ stmt
 	  { $$ = aiw_mes_stmt_set_flag($3, $6); }
 	| VAR16 '[' expr ']' '=' exprs ';'
 	  { $$ = aiw_mes_stmt_set_var16($3, $6); }
-	| SYSVAR '[' expr ']' '=' exprs ';'
-	  { $$ = aiw_mes_stmt_set_sysvar($3, $6); }
+	| SYSTEM '.' VAR16 '[' expr ']' '=' exprs ';'
+	  { $$ = aiw_mes_stmt_set_sysvar($5, $8); }
+	| SYSTEM '.' IDENTIFIER '=' exprs ';'
+	  { $$ = aiw_mf_stmt_sys_named_var_set($3, $5); }
 	| VAR32 '[' I_CONSTANT ']' '=' expr ';'
 	  { $$ = aiw_mes_stmt_set_var32(mf_parse_u8($3), $6); }
 	| VAR32 '[' I_CONSTANT ']' ARROW BYTE '[' expr ']' '=' exprs ';'
@@ -139,7 +141,8 @@ primary_expr
 	: I_CONSTANT { $$ = mf_parse_constant($1); }
 	| VAR4 '[' expr ']' { $$ = aiw_mes_expr_var4($3); }
 	| VAR16 '[' expr ']' { $$ = aiw_mes_expr_var16($3); }
-	| SYSVAR '[' expr ']' { $$ = aiw_mes_expr_sysvar($3); }
+	| SYSTEM '.' VAR16 '[' expr ']' { $$ = aiw_mes_expr_sysvar($5); }
+	| SYSTEM '.' IDENTIFIER { $$ = aiw_mf_expr_named_sysvar($3); }
 	| VAR32 '[' I_CONSTANT ']' { $$ = aiw_mes_expr_var32(mf_parse_u8($3)); }
 	| VAR32 '[' I_CONSTANT ']' ARROW BYTE '[' expr ']'
 	  { $$ = aiw_mes_expr_ptr_get8(mf_parse_u8($3), $8); }

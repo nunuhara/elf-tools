@@ -376,6 +376,25 @@ struct mes_statement *mf_stmt_sys_named_var_set(string name, mes_expression_list
 	return dword ? mes_stmt_sys_var32_set(e, vals) : mes_stmt_sys_var16_set(e, vals);
 }
 
+struct mes_statement *aiw_mf_stmt_sys_named_var_set(string name, mes_expression_list vals)
+{
+	bool dword;
+	int no = mes_resolve_sysvar(name, &dword);
+	if (no < 0)
+		PARSE_ERROR("Invalid system variable: %s", name);
+	assert(!dword);
+	uint8_t i = mes_sysvar16_index(no);
+	if (i == MES_CODE_INVALID)
+		PARSE_ERROR("System variable is not valid for game: %s", name);
+
+	string_free(name);
+
+	struct mes_statement *stmt = aiw_mes_stmt(AIW_MES_STMT_SET_SYSVAR_CONST);
+	stmt->SET_VAR_CONST.var_no = i;
+	stmt->SET_VAR_CONST.val_exprs = vals;
+	return stmt;
+}
+
 struct mes_statement *mf_stmt_named_sys(mes_qname name, mes_parameter_list _params)
 {
 	int no;
@@ -444,3 +463,19 @@ struct mes_expression *mf_expr_named_sysvar(string name)
 	return dword ? mes_expr_system_var32(index) : mes_expr_system_var16(index);
 }
 
+struct mes_expression *aiw_mf_expr_named_sysvar(string name)
+{
+	bool dword;
+	int no = mes_resolve_sysvar(name, &dword);
+	if (no < 0)
+		PARSE_ERROR("Invalid system variable: %s", name);
+	assert(!dword);
+	uint8_t i = mes_sysvar16_index(no);
+	if (i == MES_CODE_INVALID)
+		PARSE_ERROR("System variable is not valid for game: %s", name);
+	string_free(name);
+
+	struct mes_expression *expr = aiw_mes_expr(AIW_MES_EXPR_GET_SYSVAR_CONST);
+	expr->arg16 = i;
+	return expr;
+}

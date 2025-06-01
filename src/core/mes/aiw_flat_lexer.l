@@ -59,7 +59,6 @@ WS  [ \t\v\f]
 "var4" { return VAR4; }
 "var16" { return VAR16; }
 "var32" { return VAR32; }
-"sysvar" { return SYSVAR; }
 "->" { return ARROW; }
 "byte" { return BYTE; }
 "word" { return WORD; }
@@ -80,6 +79,7 @@ WS  [ \t\v\f]
 "OP_0x35" { return OP_0x35; }
 "OP_0x37" { return OP_0x37; }
 "OP_0xFE" { return OP_0xFE; }
+"System" { return SYSTEM; }
 
 {L}{AT}* { RETURN_STRING(IDENTIFIER); }
 
