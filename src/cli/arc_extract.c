@@ -264,7 +264,7 @@ enum archive_data_type {
 	ARC_OTHER,
 	ARC_MES,
 	ARC_DATA,
-	ARC_PCM,
+	ARC_AUDIO,
 };
 
 static bool suffix_equal(const char *str, const char *suffix)
@@ -285,7 +285,7 @@ static enum archive_data_type arc_data_type(const char *path)
 	if (suffix_equal(path, "data.arc"))
 		return ARC_DATA;
 	if (suffix_equal(path, ".awd") || suffix_equal(path, ".awf"))
-		return ARC_PCM;
+		return ARC_AUDIO;
 	return ARC_OTHER;
 }
 
@@ -300,8 +300,8 @@ bool arc_is_compressed(const char *path)
 	}
 
 	enum archive_data_type t = arc_data_type(path);
-	if (t == ARC_PCM)
-		return true;
+	if (t == ARC_AUDIO)
+		return false;
 	if (ai5_target_game == GAME_KAKYUUSEI)
 		return t == ARC_MES;
 
@@ -320,6 +320,7 @@ enum {
 	LOPT_MES_TEXT,
 	LOPT_MES_NAME,
 	LOPT_KEY,
+	LOPT_PCM,
 	LOPT_STEREO,
 };
 
@@ -369,6 +370,9 @@ int arc_extract(int argc, char *argv[])
 		case LOPT_KEY:
 			key = true;
 			break;
+		case LOPT_PCM:
+			flags |= ARCHIVE_PCM;
+			break;
 		case LOPT_STEREO:
 			flags |= ARCHIVE_STEREO;
 			break;
@@ -416,6 +420,7 @@ struct command cmd_arc_extract = {
 		{ "mes-flat", 0, "Output flat mes files", no_argument, LOPT_MES_FLAT },
 		{ "mes-text", 0, "Output text for mes files", no_argument, LOPT_MES_TEXT },
 		{ "mes-name-function", 0, "Specify the name function number for mes files", no_argument, LOPT_MES_NAME },
+		{ "pcm", 0, "Archive contains raw PCM data", no_argument, LOPT_PCM },
 		{ "key", 0, "Print the index encryption key (do not extract)", no_argument, LOPT_KEY },
 		{ "stereo", 0, "Raw PCM data is stereo (AWD/AWF archives)", no_argument, LOPT_STEREO },
 		{ 0 }
