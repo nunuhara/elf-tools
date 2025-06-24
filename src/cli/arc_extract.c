@@ -320,7 +320,6 @@ enum {
 	LOPT_MES_TEXT,
 	LOPT_MES_NAME,
 	LOPT_KEY,
-	LOPT_PCM,
 	LOPT_STEREO,
 };
 
@@ -370,9 +369,6 @@ int arc_extract(int argc, char *argv[])
 		case LOPT_KEY:
 			key = true;
 			break;
-		case LOPT_PCM:
-			flags |= ARCHIVE_PCM;
-			break;
 		case LOPT_STEREO:
 			flags |= ARCHIVE_STEREO;
 			break;
@@ -420,7 +416,6 @@ struct command cmd_arc_extract = {
 		{ "mes-flat", 0, "Output flat mes files", no_argument, LOPT_MES_FLAT },
 		{ "mes-text", 0, "Output text for mes files", no_argument, LOPT_MES_TEXT },
 		{ "mes-name-function", 0, "Specify the name function number for mes files", no_argument, LOPT_MES_NAME },
-		{ "pcm", 0, "Archive contains raw PCM data", no_argument, LOPT_PCM },
 		{ "key", 0, "Print the index encryption key (do not extract)", no_argument, LOPT_KEY },
 		{ "stereo", 0, "Raw PCM data is stereo (AWD/AWF archives)", no_argument, LOPT_STEREO },
 		{ 0 }
