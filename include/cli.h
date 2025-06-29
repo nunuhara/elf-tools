@@ -45,6 +45,8 @@ extern struct command cmd_font_extract;
 extern struct command cmd_lzss;
 extern struct command cmd_lzss_compress;
 extern struct command cmd_lzss_decompress;
+extern struct command cmd_mdd;
+extern struct command cmd_mdd_render;
 extern struct command cmd_mes;
 extern struct command cmd_mes_compile;
 extern struct command cmd_mes_decompile;

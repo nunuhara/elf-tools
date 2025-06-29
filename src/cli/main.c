@@ -124,6 +124,17 @@ struct command cmd_lzss = {
 	}
 };
 
+struct command cmd_mdd = {
+	.name = "mdd",
+	.usage = "<command> ...",
+	.description = "Tools for .mdd files",
+	.parent = &cmd_elf,
+	.commands = {
+		&cmd_mdd_render,
+		NULL
+	}
+};
+
 struct command cmd_mes = {
 	.name = "mes",
 	.usage = "<command> ...",
@@ -174,6 +185,7 @@ struct command cmd_elf = {
 		&cmd_eve,
 		&cmd_font,
 		&cmd_lzss,
+		&cmd_mdd,
 		&cmd_mes,
 		&cmd_mp3,
 		&cmd_mpx,

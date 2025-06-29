@@ -30,6 +30,7 @@
 #include "ai5/game.h"
 
 #include "cli.h"
+#include "mdd.h"
 #include "mes.h"
 
 static bool raw = false;
@@ -151,6 +152,27 @@ static bool extract_anim(struct archive_data *data, const char *output_file)
 	return true;
 }
 
+static bool extract_movie(struct archive_data *data, const char *output_file)
+{
+	char name[512];
+	snprintf(name, 512, "%s.GIF", output_file);
+	struct port out;
+	if (!open_output_file(name, &out))
+		return false;
+
+	size_t size;
+	uint8_t *gif = mdd_render(data->data, data->size, &size);
+	if (!gif) {
+		sys_warning("Failed to render movie file \"%s\".\n", data->name);
+		port_close(&out);
+		return false;
+	}
+	port_write_bytes(&out, gif, size);
+	port_close(&out);
+	free(gif);
+	return true;
+}
+
 static bool ext_is_cg(const char *ext)
 {
 	static const char * const cg_ext[] = {
@@ -175,6 +197,8 @@ static bool extract_file(struct archive_data *data, const char *output_file)
 		return extract_cg(data, output_file);
 	if (!strcasecmp(ext, "S4") || !strcasecmp(ext, "A"))
 		return extract_anim(data, output_file);
+	if (!strcasecmp(ext, "MDD"))
+		return extract_movie(data, output_file);
 	return extract_raw(data, output_file);
 }
 

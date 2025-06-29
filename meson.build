@@ -22,6 +22,7 @@ incdirs = include_directories('include')
 sources = [
   'src/core/anim/pack.c',
   'src/core/anim/render.c',
+  'src/core/mdd.c',
   'src/core/mes/ctor.c',
   'src/core/mes/decompile.c',
   'src/core/mes/flat_parser.c',
@@ -44,6 +45,7 @@ sources = [
   'src/cli/lzss_compress.c',
   'src/cli/lzss_decompress.c',
   'src/cli/main.c',
+  'src/cli/mdd_render.c',
   'src/cli/mes_compile.c',
   'src/cli/mes_decompile.c',
   'src/cli/mp3_extract.c',
