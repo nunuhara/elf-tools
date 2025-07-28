@@ -20,12 +20,16 @@
 
 #include "nulib.h"
 #include "nulib/file.h"
+#include "nulib/little_endian.h"
 #include "ai5/game.h"
 
 #include "cli.h"
 
 static unsigned nr_flags = 0;
 static unsigned save_size = 0;
+static unsigned flags_off = 128;
+static unsigned sysvar16_off = 0;
+static bool flags_packed = false;
 
 enum {
 	LOPT_GAME = 256,
@@ -45,13 +49,36 @@ static void save_set_game(const char *game)
 		save_size = 4096;
 		break;
 	case GAME_DOUKYUUSEI:
+	case GAME_KAKYUUSEI:
 	case GAME_YUNO:
 		nr_flags = 4096;
 		save_size = 8192;
 		break;
+	case GAME_SHUUSAKU:
+		nr_flags = 2500;
+		save_size = 3736;
+		flags_off = 0x470;
+		sysvar16_off = 0xe98;
+		flags_packed = true;
+		break;
 	default:
 		break;
 	}
+}
+
+static void guess_nr_flags(size_t size)
+{
+	if (size == 4096)
+		nr_flags = 2048;
+	else if (size == 8192)
+		nr_flags = 4096;
+	else
+		nr_flags = size - flags_off;
+}
+
+static void guess_sysvar16_off(void)
+{
+	sysvar16_off = flags_off + nr_flags + 4 + 26 * 2;
 }
 
 static uint8_t *read_save_file(const char *path, size_t *size_out)
@@ -86,30 +113,36 @@ static int save_get_flag(int argc, char *argv[])
 
 	size_t size;
 	uint8_t *mem16 = read_save_file(argv[1], &size);
-	if (size <= 128)
+	if (size <= flags_off)
 		CLI_ERROR("Invalid save file");
 
 	// determine valid range of flag numbers
-	if (!nr_flags) {
-		if (size == 4096)
-			nr_flags = 2048;
-		else if (size == 8192)
-			nr_flags = 4096;
-		else
-			nr_flags = size - 128;
-	}
-	nr_flags = min(nr_flags, size - 128);
+	if (!nr_flags)
+		guess_nr_flags(size);
+	nr_flags = min(nr_flags, size - flags_off);
 
 	// parse flag number
 	char *endptr;
 	long flag_no = strtol(argv[0], &endptr, 0);
-	if (*endptr != '\0' || flag_no < 0 || flag_no >= nr_flags)
+	if (*endptr != '\0' || flag_no < 0)
 		CLI_ERROR("Invalid flag number: %s", argv[0]);
 
 	// read and print flag
-	uint8_t flag = mem16[128 + flag_no];
-	NOTICE("flag[%ld] = %u", flag_no, (unsigned)flag);
-
+	if (flags_packed) {
+		if (flag_no >= nr_flags * 2)
+			CLI_ERROR("Invalid flag number: %s", argv[0]);
+		uint8_t flag = mem16[flags_off + flag_no/2];
+		if (flag_no % 2)
+			flag &= 0xf;
+		else
+			flag >>= 4;
+		NOTICE("flag[%ld] = %u", flag_no, (unsigned)flag);
+	} else {
+		if (flag_no >= nr_flags)
+			CLI_ERROR("Invalid flag number: %s", argv[0]);
+		uint8_t flag = mem16[flags_off + flag_no];
+		NOTICE("flag[%ld] = %u", flag_no, (unsigned)flag);
+	}
 	free(mem16);
 	return 0;
 }
@@ -120,6 +153,63 @@ static struct command cmd_save_get_flag = {
 	.description = "Get the value of a flag",
 	.parent = &cmd_save,
 	.fun = save_get_flag,
+	.options = {
+		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
+		{ 0 }
+	}
+};
+
+static int save_get_sysvar16(int argc, char *argv[])
+{
+	while (1) {
+		int c = command_getopt(argc, argv, &cmd_save_get_flag);
+		if (c == -1)
+			break;
+		switch (c) {
+		case 'g':
+		case LOPT_GAME:
+			save_set_game(optarg);
+			break;
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 2)
+		command_usage_error(&cmd_save_get_flag, "Wrong number of arguments.\n");
+
+	size_t size;
+	uint8_t *mem16 = read_save_file(argv[1], &size);
+	if (size <= 128)
+		CLI_ERROR("Invalid save file");
+
+	// determine offset of sysvar16
+	if (!nr_flags)
+		guess_nr_flags(size);
+	if (!sysvar16_off)
+		guess_sysvar16_off();
+
+	// parse flag number
+	char *endptr;
+	long var_no = strtol(argv[0], &endptr, 0);
+	if (*endptr != '\0' || var_no < 0 || sysvar16_off + var_no + 2 > size)
+		CLI_ERROR("Invalid flag number: %s", argv[0]);
+
+	// read and print flag
+	uint16_t var = le_get16(mem16, sysvar16_off + var_no * 2);
+	NOTICE("System.var16[%ld] = %u", var_no, (unsigned)var);
+
+	free(mem16);
+	return 0;
+
+}
+
+static struct command cmd_save_get_sysvar16 = {
+	.name = "get-sysvar16",
+	.usage = "<var-number> <save-file>",
+	.description = "Get the value of a system word (or heap word)",
+	.parent = &cmd_save,
+	.fun = save_get_sysvar16,
 	.options = {
 		{ "game", 'g', "Set the target game", required_argument, LOPT_GAME },
 		{ 0 }
@@ -165,6 +255,24 @@ static int save_info(int argc, char *argv[])
 		NOTICE("Chiharu: %u", (unsigned)mem16[128 + 114]);
 		NOTICE("  Reiko: %u", (unsigned)mem16[128 + 115]);
 		NOTICE("  Yayoi: %u", (unsigned)mem16[128 + 116]);
+	} else if (ai5_target_game == GAME_KAKYUUSEI) {
+#define SYSVAR16(n) ((unsigned)le_get16(mem16, 4280 + n*2))
+		NOTICE("Affection Level");
+		NOTICE("---------------");
+		NOTICE("  Reiko: %u", SYSVAR16(200));
+		NOTICE("   Miko: %u", SYSVAR16(201));
+		NOTICE(" Mizuho: %u", SYSVAR16(202));
+		NOTICE(" Mayumi: %u", SYSVAR16(203));
+		NOTICE(" Ryouko: %u", SYSVAR16(204));
+		NOTICE("   Tina: %u", SYSVAR16(205));
+		NOTICE("   Nana: %u", SYSVAR16(206));
+		NOTICE(" Miyuki: %u", SYSVAR16(207));
+		NOTICE("     Ai: %u", SYSVAR16(208));
+		NOTICE("Shizuka: %u", SYSVAR16(209));
+		NOTICE(" Mahoko: %u", SYSVAR16(210));
+		NOTICE("Minatsu: %u", SYSVAR16(211));
+		NOTICE("   Maki: %u", SYSVAR16(212));
+#undef SYSVAR16
 	} else {
 		NOTICE("Save info not supported for this game.");
 	}
@@ -193,6 +301,7 @@ struct command cmd_save = {
 	.commands = {
 		&cmd_save_get_flag,
 		&cmd_save_info,
+		&cmd_save_get_sysvar16,
 		//&cmd_save_get_reg,
 		//&cmd_save_get_reg32,
 		NULL
