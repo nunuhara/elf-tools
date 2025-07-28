@@ -33,6 +33,7 @@ enum {
 	LOPT_BMP_WIDTH,
 	LOPT_PALETTE,
 	LOPT_MPX,
+	LOPT_MPC,
 };
 
 static uint8_t *load_palette(const char *pal_path)
@@ -170,6 +171,7 @@ static void copy_tile(struct cg *tileset, struct cg *dst, unsigned tile_x, unsig
 
 static void apply_mpx(const char *mpx_path, struct cg *bmp, struct cg **bg_out, struct cg **fg_out)
 {
+
 	size_t mpx_size;
 	uint8_t *mpx = file_read(mpx_path, &mpx_size);
 	if (!mpx)
@@ -195,6 +197,42 @@ static void apply_mpx(const char *mpx_path, struct cg *bmp, struct cg **bg_out, 
 	}
 
 	free(mpx);
+	*bg_out = bg;
+	*fg_out = fg;
+}
+
+static void apply_mpc(const char *mpc_path, struct cg *tiles, struct cg **bg_out, struct cg **fg_out)
+{
+	if (!tiles->palette)
+		CLI_ERROR("Tiles CG is not indexed");
+	size_t mpc_size;
+	uint8_t *mpc = file_read(mpc_path, &mpc_size);
+	if (!mpc)
+		CLI_ERROR("Unable to read MPC file \"%s\": %s", mpc_path, strerror(errno));
+	if (mpc_size < 5)
+		CLI_ERROR("MPC file size too small: %u", (unsigned)mpc_size);
+
+	unsigned nr_cols = le_get16(mpc, 0);
+	unsigned nr_rows = le_get16(mpc, 2);
+	if (mpc_size < 4 + nr_cols * nr_rows * 3)
+		CLI_ERROR("MPC file size too small for given dimensions (%ux%u): %u",
+				nr_cols, nr_rows, (unsigned)mpc_size);
+
+	struct cg *bg = alloc_indexed_cg_with_palette(nr_cols * 16, nr_rows * 16, tiles->palette);
+	struct cg *fg = alloc_indexed_cg_with_palette(nr_cols * 16, nr_rows * 16, tiles->palette);
+
+	unsigned off = 4;
+	for (unsigned row = 0; row < nr_rows; row++) {
+		for (unsigned col = 0; col < nr_cols; col++, off += 3) {
+			uint16_t v = le_get16(mpc, off);
+			unsigned bg_i = v & 0x3ff;
+			unsigned fg_i = (v >> 10) | ((mpc[off+2] & 0xf) << 6);
+			copy_tile(tiles, bg, col, row, bg_i == 0x3ff ? 0xffff : bg_i);
+			copy_tile(tiles, fg, col, row, fg_i == 0x3ff ? 0xffff : fg_i);
+		}
+	}
+
+	free(mpc);
 	*bg_out = bg;
 	*fg_out = fg;
 }
@@ -231,6 +269,7 @@ static int cli_cg_convert(int argc, char *argv[])
 	bool raw_bitmap = false;
 	const char *pal_file = NULL;
 	const char *mpx_file = NULL;
+	const char *mpc_file = NULL;
 	int bmp_width = -1;
 
 	while (1) {
@@ -258,6 +297,9 @@ static int cli_cg_convert(int argc, char *argv[])
 		case LOPT_MPX:
 			mpx_file = optarg;
 			break;
+		case LOPT_MPC:
+			mpc_file = optarg;
+			break;
 		}
 	}
 	argc -= optind;
@@ -284,6 +326,13 @@ static int cli_cg_convert(int argc, char *argv[])
 		write_image_with_extension(fg, output_file, "fg.png");
 		cg_free(bg);
 		cg_free(fg);
+	} else if (mpc_file) {
+		struct cg *bg, *fg;
+		apply_mpc(mpc_file, cg, &bg, &fg);
+		write_image_with_extension(bg, output_file, "bg.png");
+		write_image_with_extension(fg, output_file, "fg.png");
+		cg_free(bg);
+		cg_free(fg);
 	} else {
 		write_image(output_file, cg);
 	}
@@ -305,6 +354,7 @@ struct command cmd_cg_convert = {
 		{ "bmp-width", 0, "Specify the CG width (for raw bitmap)", required_argument, LOPT_BMP_WIDTH },
 		{ "palette", 'p', "Specify a palette file (for raw bitmap)", required_argument, LOPT_PALETTE },
 		{ "mpx", 0, "Specify a mpx tilemap (for raw bitmap)", required_argument, LOPT_MPX },
+		{ "mpc", 0, "Specify a mpc tilemap", required_argument, LOPT_MPC },
 		{ 0 }
 	}
 };
