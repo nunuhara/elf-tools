@@ -176,7 +176,7 @@ static bool extract_movie(struct archive_data *data, const char *output_file)
 static bool ext_is_cg(const char *ext)
 {
 	static const char * const cg_ext[] = {
-		"GP8", "G16", "G24", "G32", "GCC", "GPR", "GPX"
+		"AKB", "GP8", "G16", "G24", "G32", "GCC", "GPR", "GPX"
 	};
 	for (unsigned i = 0; i < ARRAY_SIZE(cg_ext); i++) {
 		if (!strcasecmp(ext, cg_ext[i]))
