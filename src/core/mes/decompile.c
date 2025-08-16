@@ -32,6 +32,7 @@ enum virtual_op {
 	VOP_JMP,
 	VOP_DEF_PROC,
 	VOP_DEF_MENU, // AI5 only
+	VOP_DEF_SUB,
 	VOP_OTHER,
 };
 
@@ -43,6 +44,7 @@ static enum virtual_op ai5_vop(struct mes_statement *stmt)
 	case MES_STMT_JMP: return VOP_JMP;
 	case MES_STMT_DEF_PROC: return VOP_DEF_PROC;
 	case MES_STMT_DEF_MENU: return VOP_DEF_MENU;
+	case MES_STMT_DEF_SUB: return VOP_DEF_SUB;
 	default: return VOP_OTHER;
 	}
 }
@@ -66,6 +68,7 @@ static int ai5_vop_to_op(enum virtual_op op)
 	case VOP_JMP: return MES_STMT_JMP;
 	case VOP_DEF_PROC: return MES_STMT_DEF_PROC;
 	case VOP_DEF_MENU: return MES_STMT_DEF_MENU;
+	case VOP_DEF_SUB: return MES_STMT_DEF_SUB;
 	default: ERROR("cannot convert virtual op: %d", op);
 	}
 }
@@ -116,7 +119,7 @@ static struct mes_block *make_basic_block(mes_statement_list statements, struct 
 
 static struct mes_block *make_compound_block(struct mes_statement *head)
 {
-	assert(vop(head) == VOP_DEF_MENU || vop(head) == VOP_DEF_PROC);
+	assert(vop(head) == VOP_DEF_MENU || vop(head) == VOP_DEF_PROC || vop(head) == VOP_DEF_SUB);
 	struct mes_block *block = xcalloc(1, sizeof(struct mes_block));
 	block->type = MES_BLOCK_COMPOUND;
 	block->post = -1;
@@ -183,7 +186,7 @@ ERROR("mes file is not terminated by END statement");
 			push_statements(&current, stack[stack_ptr]);
 		}
 		// start of container block: push statements then push new block to stack
-		else if (vop(stmt) == VOP_DEF_MENU || vop(stmt) == VOP_DEF_PROC) {
+		else if (vop(stmt) == VOP_DEF_MENU || vop(stmt) == VOP_DEF_PROC || vop(stmt) == VOP_DEF_SUB) {
 			push_statements(&current, stack[stack_ptr-1]);
 			struct mes_block *new_block = make_compound_block(stmt);
 			add_child_block(stack[stack_ptr-1], new_block);
@@ -479,32 +482,6 @@ static void cfg_dom(struct mes_compound_block *compound)
 			cfg_dom(&b->compound);
 	}
 
-	/*
-	if (!compound->head || vop(compound->head) != VOP_DEF_PROC || compound->head->DEF_PROC.no_expr->arg8 != 4)
-		goto end;
-	if (!compound->head) {
-		NOTICE("toplevel:");
-	} else if (vop(compound->head) == VOP_DEF_PROC) {
-		NOTICE("procedure %d:", compound->head->DEF_PROC.no_expr->arg8);
-	} else if (vop(compound->head) == VOP_DEF_MENU) {
-		NOTICE("menu entry:");
-	}
-	vector_foreach(b, compound->post) {
-		printf("frontier[%d] = ", b->post);
-		struct mes_block *p;
-		vector_foreach(p, b->dom_front) {
-			printf("%d ", p->post);
-		}
-		printf("\n");
-	}
-
-	for (unsigned i = 0; i < len; i++) {
-		printf("doms[%u] = %d\n", i, doms[i]);
-	}
-	printf("\n");
-
-end:
-*/
 	for (unsigned i = 0; i < len; i++) {
 		struct mes_block *dominated = vector_A(compound->post, i);
 		for (int j = i; doms[j] != j; j = doms[j]) {
@@ -709,6 +686,12 @@ static struct mes_block *ast_create_node(mes_ast_block *ast_block, struct mes_bl
 			node->proc.num_expr = head->compound.head->DEF_PROC.no_expr;
 			vector_push(struct mes_ast*, *ast_block, node);
 			body = &node->proc.body;
+		} else if (vop(head->compound.head) == VOP_DEF_SUB) {
+			// SUB definition
+			struct mes_ast *node = make_ast_node(MES_AST_SUB, head->address);
+			node->proc.num_expr = head->compound.head->DEF_PROC.no_expr;
+			vector_push(struct mes_ast*, *ast_block, node);
+			body = &node->proc.body;
 		} else {
 			// menu entry definition
 			assert(vop(head->compound.head) == VOP_DEF_MENU);
@@ -888,6 +871,7 @@ static void ast_node_simplify(hashtable_t(ast_table) *table, struct mes_ast *nod
 		ast_block_simplify(table, node->loop.body, node, node, continuation);
 		break;
 	case MES_AST_PROCEDURE:
+	case MES_AST_SUB:
 		ast_block_simplify(table, node->proc.body, NULL, NULL, NULL);
 		break;
 	case MES_AST_MENU_ENTRY:
@@ -936,6 +920,7 @@ static void init_ast_table(hashtable_t(ast_table) *table, mes_ast_block block)
 			init_ast_table(table, node->loop.body);
 			break;
 		case MES_AST_PROCEDURE:
+		case MES_AST_SUB:
 			init_ast_table(table, node->proc.body);
 			break;
 		case MES_AST_MENU_ENTRY:
@@ -1103,6 +1088,7 @@ void mes_ast_free(struct mes_ast *node)
 		mes_ast_block_free(node->loop.body);
 		break;
 	case MES_AST_PROCEDURE:
+	case MES_AST_SUB:
 		mes_expression_free(node->proc.num_expr);
 		mes_ast_block_free(node->proc.body);
 		break;

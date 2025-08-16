@@ -359,6 +359,16 @@ static void mes_ast_node_print(struct mes_ast *node, int name_function, struct p
 		indent_print(out, indent);
 		port_puts(out, "};\n");
 		break;
+	case MES_AST_SUB:
+		port_putc(out, '\n');
+		indent_print(out, indent);
+		port_puts(out, "sub[");
+		mes_expression_print(node->proc.num_expr, out);
+		port_puts(out, "] = {\n");
+		_mes_ast_block_print(node->proc.body, name_function, out, indent + 1);
+		indent_print(out, indent);
+		port_puts(out, "};\n");
+		break;
 	case MES_AST_CONTINUE:
 		indent_print(out, indent);
 		port_puts(out, "continue;\n");

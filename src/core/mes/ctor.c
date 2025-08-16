@@ -16,6 +16,7 @@
 
 #include <string.h>
 #include "nulib.h"
+#include "ai5/game.h"
 
 #include "mes.h"
 
@@ -79,6 +80,28 @@ struct mes_statement *mes_stmt_setrbx(struct mes_expression *expr, mes_expressio
 		return r;
 	}
 	return mes_stmt_setrbe(expr, exprs);
+}
+
+struct mes_statement *mes_stmt_set_arg(struct mes_expression *expr, mes_expression_list exprs)
+{
+	if (expr->op == MES_EXPR_IMM) {
+		struct mes_statement *stmt = mes_stmt(MES_STMT_SET_ARG_CONST);
+		stmt->SET_VAR_CONST.var_no = expr->arg8;
+		stmt->SET_VAR_CONST.val_exprs = exprs;
+		free(expr);
+		return stmt;
+	}
+	if (expr->op == MES_EXPR_IMM16) {
+		struct mes_statement *stmt = mes_stmt(MES_STMT_SET_ARG_CONST);
+		stmt->SET_VAR_CONST.var_no = expr->arg8;
+		stmt->SET_VAR_CONST.val_exprs = exprs;
+		free(expr);
+		return stmt;
+	}
+	struct mes_statement *stmt = mes_stmt(MES_STMT_SET_ARG_EXPR);
+	stmt->SET_VAR_EXPR.var_expr = expr;
+	stmt->SET_VAR_EXPR.val_exprs = exprs;
+	return stmt;
 }
 
 struct mes_statement *mes_stmt_setv(uint8_t no, mes_expression_list exprs)
@@ -202,6 +225,13 @@ struct mes_statement *mes_stmt_call(mes_parameter_list params)
 	return stmt;
 }
 
+struct mes_statement *mes_stmt_call_sub(mes_parameter_list params)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_CALL_SUB);
+	stmt->CALL.params = params;
+	return stmt;
+}
+
 struct mes_statement *mes_stmt_proc(mes_parameter_list params)
 {
 	struct mes_statement *stmt = mes_stmt(MES_STMT_CALL_PROC);
@@ -237,9 +267,68 @@ struct mes_statement *mes_stmt_procd(struct mes_expression *expr)
 	return stmt;
 }
 
+struct mes_statement *mes_stmt_defsub(struct mes_expression *expr)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_DEF_SUB);
+	stmt->DEF_PROC.no_expr = expr;
+	return stmt;
+}
+
 struct mes_statement *mes_stmt_menus(void)
 {
 	struct mes_statement *stmt = mes_stmt(MES_STMT_MENU_EXEC);
+	return stmt;
+}
+
+struct mes_statement *mes_stmt_menus_params(mes_parameter_list params)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_MENU_EXEC);
+	if (ai5_target_game != GAME_NONOMURA) {
+		WARNING("Ignoring parameters to menuexec statement");
+		mes_parameter_list_free(params);
+		return stmt;
+	}
+	stmt->DEF_MENU.params = params;
+	return stmt;
+}
+
+struct mes_statement *mes_stmt_17(uint32_t n)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_17);
+	stmt->JMP.addr = n;
+	return stmt;
+}
+
+struct mes_statement *mes_stmt_18(struct mes_expression *expr)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_18);
+	stmt->SET_VAR_EXPR.var_expr = expr;
+	return stmt;
+}
+
+struct mes_statement *mes_stmt_19(void)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_19);
+	return stmt;
+}
+
+struct mes_statement *mes_stmt_1A(void)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_1A);
+	return stmt;
+}
+
+struct mes_statement *mes_stmt_1B(mes_parameter_list params)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_1B);
+	stmt->CALL.params = params;
+	return stmt;
+}
+
+struct mes_statement *mes_stmt_1F(uint32_t n)
+{
+	struct mes_statement *stmt = mes_stmt(MES_STMT_1F);
+	stmt->JMP.addr = n;
 	return stmt;
 }
 
@@ -463,6 +552,25 @@ struct mes_expression *mes_expr_var4(struct mes_expression *index)
 		return expr;
 	}
 	struct mes_expression *expr = mes_expr(MES_EXPR_GET_FLAG_EXPR);
+	expr->sub_a = index;
+	return expr;
+}
+
+struct mes_expression *mes_expr_arg(struct mes_expression *index)
+{
+	if (index->op == MES_EXPR_IMM) {
+		struct mes_expression *expr = mes_expr(MES_EXPR_GET_ARG_CONST);
+		expr->arg16 = index->arg8;
+		free(index);
+		return expr;
+	}
+	if (index->op == MES_EXPR_IMM16) {
+		struct mes_expression *expr = mes_expr(MES_EXPR_GET_ARG_CONST);
+		expr->arg16 = index->arg16;
+		free(index);
+		return expr;
+	}
+	struct mes_expression *expr = mes_expr(MES_EXPR_GET_ARG_EXPR);
 	expr->sub_a = index;
 	return expr;
 }

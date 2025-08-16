@@ -64,12 +64,14 @@ static uint32_t _expression_size(struct mes_expression *expr)
 		break;
 	case MES_EXPR_IMM16:
 	case MES_EXPR_GET_FLAG_CONST:
+	case MES_EXPR_GET_ARG_CONST:
 		len += 2;
 		break;
 	case MES_EXPR_IMM32:
 		len += 4;
 		break;
 	case MES_EXPR_GET_FLAG_EXPR:
+	case MES_EXPR_GET_ARG_EXPR:
 		len += _expression_size(expr->sub_a);
 		break;
 	case MES_EXPR_END:
@@ -172,7 +174,7 @@ uint32_t mes_statement_size(struct mes_statement *stmt)
 	uint32_t len = 1;
 	switch (stmt->op) {
 	case MES_STMT_END:
-		break;
+		return len;
 	case MES_STMT_ZENKAKU:
 	case MES_STMT_HANKAKU:
 		if (stmt->op == MES_STMT_ZENKAKU) {
@@ -184,18 +186,20 @@ uint32_t mes_statement_size(struct mes_statement *stmt)
 			len++;
 		if (stmt->TXT.unprefixed)
 			len--;
-		break;
+		return len;
 	case MES_STMT_SET_FLAG_CONST:
+	case MES_STMT_SET_ARG_CONST:
 		len += 2 + expression_list_size(stmt->SET_VAR_CONST.val_exprs);
-		break;
+		return len;
 	case MES_STMT_SET_VAR16:
 	case MES_STMT_SET_VAR32:
 		len += 1 + expression_list_size(stmt->SET_VAR_CONST.val_exprs);
-		break;
+		return len;
 	case MES_STMT_SET_FLAG_EXPR:
+	case MES_STMT_SET_ARG_EXPR:
 		len += expression_size(stmt->SET_VAR_EXPR.var_expr);
 		len += expression_list_size(stmt->SET_VAR_EXPR.val_exprs);
-		break;
+		return len;
 	case MES_STMT_PTR16_SET8:
 	case MES_STMT_PTR16_SET16:
 	case MES_STMT_PTR32_SET8:
@@ -203,38 +207,49 @@ uint32_t mes_statement_size(struct mes_statement *stmt)
 	case MES_STMT_PTR32_SET32:
 		len += expression_size(stmt->PTR_SET.off_expr) + 1;
 		len += expression_list_size(stmt->PTR_SET.val_exprs);
-		break;
+		return len;
 	case MES_STMT_JZ:
 		len += expression_size(stmt->JZ.expr) + 4;
-		break;
+		return len;
 	case MES_STMT_JMP:
+	case MES_STMT_17:
+	case MES_STMT_1F:
 		len += 4;
-		break;
+		return len;
 	case MES_STMT_SYS:
 		len += expression_size(stmt->SYS.expr);
 		len += parameter_list_size(stmt->SYS.params);
-		break;
+		return len;
 	case MES_STMT_JMP_MES:
 	case MES_STMT_CALL_MES:
 	case MES_STMT_CALL_PROC:
 	case MES_STMT_UTIL:
+	case MES_STMT_CALL_SUB:
+	case MES_STMT_1B:
 		len += parameter_list_size(stmt->CALL.params);
-		break;
+		return len;
 	case MES_STMT_DEF_MENU:
 		len += parameter_list_size(stmt->DEF_MENU.params) + 4;
-		break;
+		return len;
 	case MES_STMT_LINE:
 		len++;
-		break;
+		return len;
 	case MES_STMT_DEF_PROC:
+	case MES_STMT_DEF_SUB:
 		len += expression_size(stmt->DEF_PROC.no_expr) + 4;
-		break;
+		return len;
 	case MES_STMT_MENU_EXEC:
-		break;
-	default:
-		ERROR("invalid statement type");
+		if (ai5_target_game == GAME_NONOMURA)
+			len += parameter_list_size(stmt->DEF_MENU.params);
+		return len;
+	case MES_STMT_18:
+		len += expression_size(stmt->SET_VAR_EXPR.var_expr);
+		return len;
+	case MES_STMT_19:
+	case MES_STMT_1A:
+		return len;
 	}
-	return len;
+	ERROR("invalid statement type");
 }
 
 static uint32_t _aiw_expression_size(struct mes_expression *expr)

@@ -191,7 +191,7 @@ static bool extract_file(struct archive_data *data, const char *output_file)
 		return extract_raw(data, output_file);
 
 	const char *ext = file_extension(data->name);
-	if (!strcasecmp(ext, "MES"))
+	if (!strcasecmp(ext, "MES") || !strcasecmp(ext, "LIB"))
 		return extract_mes(data, output_file);
 	if (ext_is_cg(ext))
 		return extract_cg(data, output_file);
@@ -245,7 +245,7 @@ static string get_output_path(const char *dir, const char *name)
 		return string_concat_cstring(path, name);
 
 	const char *ext = file_extension(name);
-	if (!strcasecmp(ext, "MES")) {
+	if (!strcasecmp(ext, "MES") || !strcasecmp(ext, "LIB")) {
 		if (mes_text)
 			return make_output_path(path, name, "TXT");
 		return make_output_path(path, name, "SMES");

@@ -87,6 +87,8 @@ enum mes_ast_type {
 	MES_AST_PROCEDURE,
 	// menu <n> { ... }
 	MES_AST_MENU_ENTRY,
+	// sub <n> { ... }
+	MES_AST_SUB,
 	// continue
 	MES_AST_CONTINUE,
 	// break
@@ -137,6 +139,7 @@ struct mes_statement *mes_stmt_str(string str);
 struct mes_statement *mes_stmt_setrbc(uint16_t no, mes_expression_list exprs);
 struct mes_statement *mes_stmt_setrbe(struct mes_expression *expr, mes_expression_list exprs);
 struct mes_statement *mes_stmt_setrbx(struct mes_expression *expr, mes_expression_list exprs);
+struct mes_statement *mes_stmt_set_arg(struct mes_expression *expr, mes_expression_list exprs);
 struct mes_statement *mes_stmt_setv(uint8_t no, mes_expression_list exprs);
 struct mes_statement *mes_stmt_setrd(uint8_t no, mes_expression_list exprs);
 struct mes_statement *mes_stmt_setac(uint8_t no, struct mes_expression *off,
@@ -158,15 +161,25 @@ struct mes_statement *mes_stmt_jmp(void);
 struct mes_statement *mes_stmt_sys(struct mes_expression *expr, mes_parameter_list params);
 struct mes_statement *mes_stmt_goto(mes_parameter_list params);
 struct mes_statement *mes_stmt_call(mes_parameter_list params);
+struct mes_statement *mes_stmt_call_sub(mes_parameter_list params);
 struct mes_statement *mes_stmt_proc(mes_parameter_list params);
 struct mes_statement *mes_stmt_menui(mes_parameter_list params);
 struct mes_statement *mes_stmt_util(mes_parameter_list params);
 struct mes_statement *mes_stmt_line(uint8_t arg);
 struct mes_statement *mes_stmt_procd(struct mes_expression *expr);
+struct mes_statement *mes_stmt_defsub(struct mes_expression *expr);
 struct mes_statement *mes_stmt_menus(void);
+struct mes_statement *mes_stmt_menus_params(mes_parameter_list params);
+struct mes_statement *mes_stmt_17(uint32_t n);
+struct mes_statement *mes_stmt_18(struct mes_expression *expr);
+struct mes_statement *mes_stmt_19(void);
+struct mes_statement *mes_stmt_1A(void);
+struct mes_statement *mes_stmt_1B(mes_parameter_list params);
+struct mes_statement *mes_stmt_1F(uint32_t n);
 struct mes_expression *mes_expr(enum mes_expression_op op);
 struct mes_expression *mes_expr_constant(long i);
 struct mes_expression *mes_expr_var4(struct mes_expression *index);
+struct mes_expression *mes_expr_arg(struct mes_expression *index);
 struct mes_expression *mes_expr_var16(uint8_t no);
 struct mes_expression *mes_expr_var32(uint8_t no);
 struct mes_expression *mes_expr_system_var16(struct mes_expression *index);

@@ -59,6 +59,7 @@ WS  [ \t\v\f]
 "var4" { return VAR4; }
 "var16" { return VAR16; }
 "var32" { return VAR32; }
+"arg" { return ARG; }
 "->" { return ARROW; }
 "byte" { return BYTE; }
 "word" { return WORD; }
@@ -69,6 +70,7 @@ WS  [ \t\v\f]
 "goto" { return GOTO; }
 "jump" { return JUMP; }
 "call" { return CALL; }
+"call_sub" { return CALL_SUB; }
 "line" { return LINE; }
 "menuexec" { return MENUEXEC; }
 "jz" { return JZ; }
@@ -76,6 +78,14 @@ WS  [ \t\v\f]
 "return" { return RETURN; }
 "defproc" { return DEFPROC; }
 "defmenu" { return DEFMENU; }
+"defsub" { return DEFSUB; }
+
+"OP_0x17" { return OP_0x17; }
+"OP_0x18" { return OP_0x18; }
+"OP_0x19" { return OP_0x19; }
+"OP_0x1A" { return OP_0x1A; }
+"OP_0x1B" { return OP_0x1B; }
+"OP_0x1F" { return OP_0x1F; }
 
 	/* namespaces */
 "System" { return SYSTEM; }

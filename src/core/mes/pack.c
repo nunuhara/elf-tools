@@ -117,6 +117,7 @@ static void _pack_expression(struct buffer *mes, struct mes_expression *expr)
 		break;
 	case MES_EXPR_IMM16:
 	case MES_EXPR_GET_FLAG_CONST:
+	case MES_EXPR_GET_ARG_CONST:
 		buffer_write_u16(mes, expr->arg16);
 		break;
 	case MES_EXPR_IMM32:
@@ -140,6 +141,7 @@ static void _pack_expression(struct buffer *mes, struct mes_expression *expr)
 	case MES_EXPR_NEQ:
 	case MES_EXPR_RAND:
 	case MES_EXPR_GET_FLAG_EXPR:
+	case MES_EXPR_GET_ARG_EXPR:
 	case MES_EXPR_END:
 		break;
 	}
@@ -198,6 +200,7 @@ static void pack_statement(struct buffer *mes, struct mes_statement *stmt)
 		pack_string(mes, stmt->TXT.text, stmt->TXT.terminated, 0);
 		break;
 	case MES_STMT_SET_FLAG_CONST:
+	case MES_STMT_SET_ARG_CONST:
 		buffer_write_u16(mes, stmt->SET_VAR_CONST.var_no);
 		pack_expression_list(mes, stmt->SET_VAR_CONST.val_exprs);
 		break;
@@ -207,6 +210,7 @@ static void pack_statement(struct buffer *mes, struct mes_statement *stmt)
 		pack_expression_list(mes, stmt->SET_VAR_CONST.val_exprs);
 		break;
 	case MES_STMT_SET_FLAG_EXPR:
+	case MES_STMT_SET_ARG_EXPR:
 		pack_expression(mes, stmt->SET_VAR_EXPR.var_expr);
 		pack_expression_list(mes, stmt->SET_VAR_EXPR.val_exprs);
 		break;
@@ -224,6 +228,7 @@ static void pack_statement(struct buffer *mes, struct mes_statement *stmt)
 		buffer_write_u32(mes, stmt->JZ.addr);
 		break;
 	case MES_STMT_JMP:
+	case MES_STMT_1F:
 		buffer_write_u32(mes, stmt->JMP.addr);
 		break;
 	case MES_STMT_SYS:
@@ -234,6 +239,8 @@ static void pack_statement(struct buffer *mes, struct mes_statement *stmt)
 	case MES_STMT_CALL_MES:
 	case MES_STMT_CALL_PROC:
 	case MES_STMT_UTIL:
+	case MES_STMT_CALL_SUB:
+	case MES_STMT_1B:
 		pack_parameter_list(mes, stmt->CALL.params);
 		break;
 	case MES_STMT_DEF_MENU:
@@ -244,10 +251,22 @@ static void pack_statement(struct buffer *mes, struct mes_statement *stmt)
 		buffer_write_u8(mes, stmt->LINE.arg);
 		break;
 	case MES_STMT_DEF_PROC:
+	case MES_STMT_DEF_SUB:
 		pack_expression(mes, stmt->DEF_PROC.no_expr);
 		buffer_write_u32(mes, stmt->DEF_PROC.skip_addr);
 		break;
 	case MES_STMT_MENU_EXEC:
+		if (ai5_target_game == GAME_NONOMURA)
+			pack_parameter_list(mes, stmt->DEF_MENU.params);
+		break;
+	case MES_STMT_17:
+		buffer_write_u32(mes, stmt->JMP.addr);
+		break;
+	case MES_STMT_18:
+		pack_expression(mes, stmt->SET_VAR_EXPR.var_expr);
+		break;
+	case MES_STMT_19:
+	case MES_STMT_1A:
 		break;
 	}
 }
@@ -267,8 +286,23 @@ uint8_t *mes_pack(mes_statement_list stmts, size_t *size_out)
 		pack(&mes, stmt);
 	}
 
-	if (ai5_target_game == GAME_KAWARAZAKIKE) {
-		// addr table
+	// addr table
+	if (ai5_target_game == GAME_NONOMURA) {
+		struct buffer tab;
+		buffer_init(&tab, NULL, 0);
+		buffer_write_u32(&tab, 0);
+		unsigned count = 0;
+		vector_foreach(stmt, stmts) {
+			if (stmt->op == MES_STMT_17) {
+				buffer_write_u32(&tab, stmt->address);
+				count++;
+			}
+		}
+		buffer_write_u32_at(&tab, 0, count);
+		buffer_write_bytes(&tab, mes.buf, mes.index);
+		free(mes.buf);
+		mes = tab;
+	} else if (ai5_target_game == GAME_KAWARAZAKIKE) {
 		// TODO: test if this actually works in-game
 		// FIXME: avoid extra allocation/copy
 		uint8_t *out = xmalloc(mes.index + 4);

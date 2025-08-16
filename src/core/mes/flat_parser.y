@@ -28,9 +28,10 @@
 %token  <string>	IDENTIFIER I_CONSTANT STRING_LITERAL
 %token  <token>		LPAREN RPAREN PLUS MINUS MUL DIV MOD INVALID_TOKEN
 %token  <token>		AND_OP OR_OP LE_OP GE_OP EQ_OP NE_OP
-%token  <token>		VAR4 VAR16 VAR32 ARROW BYTE WORD DWORD RANDOM SYSTEM
-%token  <token>		JZ GOTO JUMP CALL UTIL LINE MENUEXEC
-%token  <token>		FUNCTION RETURN DEFPROC DEFMENU
+%token  <token>		VAR4 VAR16 VAR32 ARG ARROW BYTE WORD DWORD RANDOM SYSTEM
+%token  <token>		JZ GOTO JUMP CALL CALL_SUB UTIL LINE MENUEXEC
+%token  <token>		FUNCTION RETURN DEFPROC DEFMENU DEFSUB
+%token  <token>		OP_0x17 OP_0x18 OP_0x19 OP_0x1A OP_0x1B OP_0x1F
 
 %type   <program>	stmts str
 %type   <statement>	stmt
@@ -71,6 +72,8 @@ stmt
 	  { $$ = mes_stmt_end(); }
 	| VAR4 '[' expr ']' '=' exprs ';'
 	  { $$ = mes_stmt_setrbx($3, $6); }
+	| ARG '[' expr ']' '=' exprs ';'
+	  { $$ = mes_stmt_set_arg($3, $6); }
 	| VAR16 '[' I_CONSTANT ']' '=' exprs ';'
 	  { $$ = mes_stmt_setv(mf_parse_u8($3), $6); }
 	| VAR32 '[' I_CONSTANT ']' '=' exprs ';'
@@ -93,6 +96,8 @@ stmt
 	  { $$ = mes_stmt_goto($2); }
 	| CALL params ';'
 	  { $$ = mf_stmt_call($2); }
+	| CALL_SUB params ';'
+	  { $$ = mes_stmt_call_sub($2); }
 	| UTIL '.' path params ';'
 	  { $$ = mf_stmt_util($3, $4); }
 	| UTIL params ';'
@@ -101,6 +106,8 @@ stmt
 	  { $$ = mes_stmt_line(mf_parse_u8($2)); }
 	| MENUEXEC ';'
 	  { $$ = mes_stmt_menus(); }
+	| MENUEXEC params ';'
+	  { $$ = mes_stmt_menus_params($2); }
 	| SYSTEM '.' path params ';'
 	  { $$ = mf_stmt_named_sys($3, $4); }
 	| SYSTEM '.' IDENTIFIER '=' exprs ';'
@@ -113,6 +120,20 @@ stmt
 	  { $$ = mes_stmt_procd($2); mf_push_label_ref($$, $3); }
 	| DEFMENU params IDENTIFIER ';'
 	  { $$ = mes_stmt_menui($2); mf_push_label_ref($$, $3); }
+	| DEFSUB expr IDENTIFIER ';'
+	  { $$ = mes_stmt_defsub($2); mf_push_label_ref($$, $3); }
+	| OP_0x17 I_CONSTANT ';'
+	  { $$ = mes_stmt_17(mf_parse_u32($2)); }
+	| OP_0x18 expr ';'
+	  { $$ = mes_stmt_18($2); }
+	| OP_0x19 ';'
+	  { $$ = mes_stmt_19(); }
+	| OP_0x1A ';'
+	  { $$ = mes_stmt_1A(); }
+	| OP_0x1B params ';'
+	  { $$ = mes_stmt_1B($2); }
+	| OP_0x1F I_CONSTANT ';'
+	  { $$ = mes_stmt_1F(mf_parse_u32($2)); }
 	;
 
 path
@@ -134,6 +155,7 @@ exprs
 primary_expr
 	: I_CONSTANT { $$ = mf_parse_constant($1); }
 	| VAR4 '[' expr ']' { $$ = mes_expr_var4($3); }
+	| ARG '[' expr ']' { $$ = mes_expr_arg($3); }
 	| VAR16 '[' I_CONSTANT ']' { $$ = mes_expr_var16(mf_parse_u8($3)); }
 	| VAR32 '[' I_CONSTANT ']' { $$ = mes_expr_var32(mf_parse_u8($3)); }
 	| VAR16 '[' I_CONSTANT ']' ARROW BYTE '[' expr ']'
