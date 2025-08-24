@@ -48,4 +48,7 @@ struct arc_manifest {
 struct arc_manifest *arc_manifest_parse(const char *path);
 void arc_manifest_free(struct arc_manifest *mf);
 
+enum ai5_game_id;
+bool arc_is_compressed(const char *path, enum ai5_game_id game_id);
+
 #endif

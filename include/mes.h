@@ -264,4 +264,19 @@ bool mes_text_parse(FILE *f, mes_text_sub_list *out);
 void mes_text_sub_list_free(mes_text_sub_list list);
 mes_statement_list mes_substitute_text(mes_statement_list mes, mes_text_sub_list subs_in);
 
+enum mes_virtual_op {
+	VOP_END,
+	VOP_JZ,
+	VOP_JMP,
+	VOP_DEF_PROC,
+	VOP_DEF_MENU, // AI5 only
+	VOP_DEF_SUB,
+	VOP_OTHER,
+};
+
+enum mes_virtual_op mes_ai5_vop(struct mes_statement *stmt);
+enum mes_virtual_op mes_aiw_vop(struct mes_statement *stmt);
+int mes_ai5_vop_to_op(enum mes_virtual_op op);
+int mes_aiw_vop_to_op(enum mes_virtual_op op);
+
 #endif // ELF_TOOLS_MES_H

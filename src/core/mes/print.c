@@ -104,6 +104,13 @@ static void indent_print(struct port *out, int indent)
 	}
 }
 
+static enum mes_virtual_op vop(struct mes_statement *stmt)
+{
+	if (game_is_aiwin())
+		return mes_aiw_vop(stmt);
+	return mes_ai5_vop(stmt);
+}
+
 static void mes_block_edge_print(struct mes_basic_block *block, struct port *out, int indent)
 {
 	struct mes_statement *edge = block->end;
@@ -113,18 +120,18 @@ static void mes_block_edge_print(struct mes_basic_block *block, struct port *out
 	}
 	indent_print(out, indent);
 
-	switch (edge->op) {
-	case MES_STMT_JZ:
+	switch (vop(edge)) {
+	case VOP_JZ:
 		port_puts(out, "JZ ");
 		mes_expression_print(edge->JZ.expr, out);
 		port_printf(out, " L_%08x; // %04d\n", edge->JZ.addr,
 				block->jump_target->post);
 		break;
-	case MES_STMT_JMP:
+	case VOP_JMP:
 		port_printf(out, "JMP L_%08x; // %04d\n", edge->JMP.addr,
 				block->jump_target->post);
 		break;
-	case MES_STMT_END:
+	case VOP_END:
 		port_printf(out, "END;\n");
 		break;
 	default:
@@ -144,13 +151,15 @@ static void _mes_block_print(struct mes_block *block, struct port *out, int inde
 		return;
 	}
 
+	enum mes_virtual_op op = vop(block->compound.head);
+
 	// header
 	indent_print(out, indent);
-	if (block->compound.head->op == MES_STMT_DEF_MENU) {
+	if (op == VOP_DEF_MENU) {
 		port_puts(out, "menu[");
 		mes_parameter_list_print(block->compound.head->DEF_MENU.params, out);
 		port_puts(out, "] = {\n");
-	} else if (block->compound.head->op == MES_STMT_DEF_PROC) {
+	} else if (op == VOP_DEF_PROC) {
 		port_puts(out, "procedure[");
 		mes_expression_print(block->compound.head->DEF_PROC.no_expr, out);
 		port_puts(out, "] = {\n");
@@ -165,10 +174,10 @@ static void _mes_block_print(struct mes_block *block, struct port *out, int inde
 	// footer
 	indent_print(out, indent);
 	port_puts(out, "}; // end of ");
-	if (block->compound.head->op == MES_STMT_DEF_MENU) {
+	if (op == VOP_DEF_MENU) {
 		port_puts(out, "menu entry ");
 		mes_parameter_list_print(block->compound.head->DEF_MENU.params, out);
-	} else if (block->compound.head->op == MES_STMT_DEF_PROC) {
+	} else if (op == VOP_DEF_PROC) {
 		port_puts(out, "procedure ");
 		mes_expression_print(block->compound.head->DEF_PROC.no_expr, out);
 	} else assert(false);
@@ -207,26 +216,30 @@ static void _mes_block_tree_print(struct mes_block *block, struct port *out, int
 	if (block->type == MES_BLOCK_BASIC) {
 		port_printf(out, "%u STATEMENTS", (unsigned)vector_length(block->basic.statements));
 		if (block->basic.end) {
-			if (block->basic.end->op == MES_STMT_JZ) {
-				port_puts(out, ", JZ");
-			} else if (block->basic.end->op == MES_STMT_JMP) {
-				port_puts(out, ", END");
-			} else if (block->basic.end->op == MES_STMT_END) {
-				port_puts(out, ", END");
-			} else {
+			switch (vop(block->basic.end)) {
+			case VOP_JZ:  port_puts(out, ", JZ"); break;
+			case VOP_JMP: port_puts(out, ", END"); break;
+			case VOP_END: port_puts(out, ", END"); break;
+			default:
 				port_printf(out, ", %d (BUG)", (int)block->basic.end->op);
+				break;
 			}
 		}
 		port_putc(out, '\n');
 		return;
 	}
-	if (block->compound.head->op == MES_STMT_DEF_MENU) {
+	switch (vop(block->compound.head)) {
+	case VOP_DEF_MENU:
 		port_puts(out, "MENU ENTRY ");
 		mes_parameter_list_print(block->compound.head->DEF_MENU.params, out);
-	} else if (block->compound.head->op == MES_STMT_DEF_PROC) {
+		break;
+	case VOP_DEF_PROC:
 		port_puts(out, "PROCEDURE ");
 		mes_expression_print(block->compound.head->DEF_PROC.no_expr, out);
-	} else assert(false);
+		break;
+	default:
+		assert(false);
+	}
 	port_putc(out, '\n');
 
 	struct mes_block *child;

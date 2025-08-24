@@ -461,9 +461,6 @@ static void set_key_by_game(const char *name, struct arc_metadata *meta)
 	*meta = game_keys[id];
 }
 
-// arc_extract.c
-bool arc_is_compressed(const char *path);
-
 enum {
 	LOPT_GAME = 256,
 	LOPT_KEY,
@@ -516,7 +513,7 @@ break;
 		sys_error("Unsupported manifest type.\n");
 
 	if (!compress && !no_compress)
-		compress = arc_is_compressed(mf->output_path);
+		compress = arc_is_compressed(mf->output_path, ai5_target_game);
 
 	struct archive *arc = NULL;
 	arc_file_list files = arcpack_file_list(&mf->arcpack, &arc, &meta, compress);

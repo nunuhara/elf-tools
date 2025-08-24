@@ -22,6 +22,7 @@ incdirs = include_directories('include')
 sources = [
   'src/core/anim/pack.c',
   'src/core/anim/render.c',
+  'src/core/arc/arc.c',
   'src/core/mdd.c',
   'src/core/mes/ctor.c',
   'src/core/mes/decompile.c',

@@ -29,6 +29,7 @@
 #include "ai5/cg.h"
 #include "ai5/game.h"
 
+#include "arc.h"
 #include "cli.h"
 #include "mdd.h"
 #include "mes.h"
@@ -187,10 +188,16 @@ static bool ext_is_cg(const char *ext)
 
 static bool extract_file(struct archive_data *data, const char *output_file)
 {
+	// XXX: hack for encrypted mes files in Kisaku
+	const char *ext = file_extension(data->name);
+	if (ai5_target_game == GAME_KISAKU && !strcasecmp(ext, "MES")) {
+		for (size_t i = 0; i < data->size; i++) {
+			data->data[i] ^= 0x55;
+		}
+	}
+
 	if (raw)
 		return extract_raw(data, output_file);
-
-	const char *ext = file_extension(data->name);
 	if (!strcasecmp(ext, "MES") || !strcasecmp(ext, "LIB"))
 		return extract_mes(data, output_file);
 	if (ext_is_cg(ext))
@@ -284,55 +291,6 @@ static void extract_all(struct archive *arc, const char *_output_dir)
 	free(output_dir);
 }
 
-enum archive_data_type {
-	ARC_OTHER,
-	ARC_MES,
-	ARC_DATA,
-	ARC_AUDIO,
-};
-
-static bool suffix_equal(const char *str, const char *suffix)
-{
-	size_t str_len = strlen(str);
-	size_t suffix_len = strlen(suffix);
-	if (str_len < suffix_len)
-		return false;
-
-	const char *start = str + (str_len - suffix_len);
-	return !strcasecmp(start, suffix);
-}
-
-static enum archive_data_type arc_data_type(const char *path)
-{
-	if (suffix_equal(path, "mes.arc") || suffix_equal(path, "message.arc"))
-		return ARC_MES;
-	if (suffix_equal(path, "data.arc"))
-		return ARC_DATA;
-	if (suffix_equal(path, ".awd") || suffix_equal(path, ".awf"))
-		return ARC_AUDIO;
-	return ARC_OTHER;
-}
-
-bool arc_is_compressed(const char *path)
-{
-	switch (ai5_target_game) {
-	case GAME_ALLSTARS:
-	case GAME_KAWARAZAKIKE:
-		return false;
-	default:
-		break;
-	}
-
-	enum archive_data_type t = arc_data_type(path);
-	if (t == ARC_AUDIO)
-		return false;
-	if (ai5_target_game == GAME_KAKYUUSEI)
-		return t == ARC_MES;
-
-	// TODO: try to read bMESTYPE / bDATATYPE from AI5WIN.INI?
-	return t == ARC_MES || t == ARC_DATA;
-}
-
 enum {
 	LOPT_OUTPUT = 256,
 	LOPT_GAME,
@@ -404,7 +362,7 @@ int arc_extract(int argc, char *argv[])
 	if (argc != 1)
 		command_usage_error(&cmd_arc_extract, "Wrong number of arguments.\n");
 
-	if (no_decompress || (!decompress && !arc_is_compressed(argv[0])))
+	if (no_decompress || (!decompress && !arc_is_compressed(argv[0], ai5_target_game)))
 		flags |= ARCHIVE_RAW;
 
 	struct archive *arc = archive_open(argv[0], flags);

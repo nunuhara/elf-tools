@@ -26,17 +26,7 @@
 #define DECOMPILER_WARNING(fmt, ...) \
 	sys_warning("*WARNING*: " fmt "\n", ##__VA_ARGS__)
 
-enum virtual_op {
-	VOP_END,
-	VOP_JZ,
-	VOP_JMP,
-	VOP_DEF_PROC,
-	VOP_DEF_MENU, // AI5 only
-	VOP_DEF_SUB,
-	VOP_OTHER,
-};
-
-static enum virtual_op ai5_vop(struct mes_statement *stmt)
+enum mes_virtual_op mes_ai5_vop(struct mes_statement *stmt)
 {
 	switch (stmt->op) {
 	case MES_STMT_END: return VOP_END;
@@ -49,7 +39,7 @@ static enum virtual_op ai5_vop(struct mes_statement *stmt)
 	}
 }
 
-static enum virtual_op aiw_vop(struct mes_statement *stmt)
+enum mes_virtual_op mes_aiw_vop(struct mes_statement *stmt)
 {
 	switch (stmt->aiw_op) {
 	case AIW_MES_STMT_END: return VOP_END;
@@ -60,7 +50,7 @@ static enum virtual_op aiw_vop(struct mes_statement *stmt)
 	}
 }
 
-static int ai5_vop_to_op(enum virtual_op op)
+int mes_ai5_vop_to_op(enum mes_virtual_op op)
 {
 	switch (op) {
 	case VOP_END: return MES_STMT_END;
@@ -73,7 +63,7 @@ static int ai5_vop_to_op(enum virtual_op op)
 	}
 }
 
-static int aiw_vop_to_op(enum virtual_op op)
+int mes_aiw_vop_to_op(enum mes_virtual_op op)
 {
 	switch (op) {
 	case VOP_END: return AIW_MES_STMT_END;
@@ -84,17 +74,17 @@ static int aiw_vop_to_op(enum virtual_op op)
 	}
 }
 
-static enum virtual_op (*vop)(struct mes_statement*) = ai5_vop;
-static int (*vop_to_op)(enum virtual_op) = ai5_vop_to_op;
+static enum mes_virtual_op (*vop)(struct mes_statement*) = mes_ai5_vop;
+static int (*vop_to_op)(enum mes_virtual_op) = mes_ai5_vop_to_op;
 
 static void vop_init(void)
 {
 	if (game_is_aiwin()) {
-		vop = aiw_vop;
-		vop_to_op = aiw_vop_to_op;
+		vop = mes_aiw_vop;
+		vop_to_op = mes_aiw_vop_to_op;
 	} else {
-		vop = ai5_vop;
-		vop_to_op = ai5_vop_to_op;
+		vop = mes_ai5_vop;
+		vop_to_op = mes_ai5_vop_to_op;
 	}
 }
 
