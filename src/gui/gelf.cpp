@@ -426,7 +426,11 @@ bool GElf::convertFormat(struct port *port, const QString &name, uint8_t *data, 
 				fileError(name, tr("Failed to decompile animation file"));
 				return false;
 			}
-			anim_print(port, anim);
+			if (!anim_print(port, anim)) {
+				fileError(name, tr("Failed to decompile animation file"));
+				anim_free(anim);
+				return false;
+			}
 			anim_free(anim);
 			return true;
 		}

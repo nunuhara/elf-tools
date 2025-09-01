@@ -246,15 +246,20 @@ static bool extract_file(struct archive_data *data, const char *output_file,
 	return extract_raw(data, output_file);
 }
 
-void arc_extract_one(struct archive *arc, const char *name, const char *output_file,
+bool arc_extract_one(struct archive *arc, const char *name, const char *output_file,
 		struct arc_extract_options *opt)
 {
 	struct archive_data *data = archive_get(arc, name);
-	if (!data)
-		sys_error("Failed to read file \"%s\" from archive.\n", name);
-	if (!extract_file(data, output_file, opt))
-		sys_error("failed to write output file");
+	if (!data) {
+		sys_warning("Failed to read file \"%s\" from archive.\n", name);
+		return false;
+	}
+	if (!extract_file(data, output_file, opt)) {
+		sys_warning("failed to write output file");
+		return false;
+	}
 	archive_data_release(data);
+	return true;
 }
 
 // Add a trailing slash to a path
@@ -302,18 +307,21 @@ static string get_output_path(const char *dir, const char *name,
 	return string_concat_cstring(path, name);
 }
 
-void arc_extract_all(struct archive *arc, const char *_output_dir,
+bool arc_extract_all(struct archive *arc, const char *_output_dir,
 		struct arc_extract_options *opt)
 {
 	char *output_dir = output_dir_path(_output_dir);
 	if (mkdir_p(output_dir) < 0) {
-		sys_error("Failed to create output directory: %s.\n", strerror(errno));
+		sys_warning("Failed to create output directory: %s.\n", strerror(errno));
+		return false;
 	}
 
+	bool r = true;
 	struct archive_data *data;
 	archive_foreach(data, arc) {
 		if (!archive_data_load(data)) {
 			sys_warning("Failed to read file \"%s\" from archive\n", data->name);
+			r = false;
 			continue;
 		}
 		string output_file = get_output_path(output_dir, data->name, opt);
@@ -322,9 +330,11 @@ void arc_extract_all(struct archive *arc, const char *_output_dir,
 			sys_message("OK\n");
 		} else {
 			sys_warning("failed to extract file \"%s\"\n", data->name);
+			r = false;
 		}
 		string_free(output_file);
 		archive_data_release(data);
 	}
 	free(output_dir);
+	return r;
 }

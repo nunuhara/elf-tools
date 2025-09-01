@@ -71,9 +71,9 @@ struct arc_extract_options {
 
 enum archive_data_type arc_data_type(const char *path);
 bool arc_is_compressed(const char *path, enum ai5_game_id game_id);
-void arc_extract_one(struct archive *arc, const char *name, const char *output_file,
+bool arc_extract_one(struct archive *arc, const char *name, const char *output_file,
 		struct arc_extract_options *opt);
-void arc_extract_all(struct archive *arc, const char *_output_dir,
+bool arc_extract_all(struct archive *arc, const char *_output_dir,
 		struct arc_extract_options *opt);
 
 #endif

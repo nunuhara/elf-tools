@@ -80,8 +80,10 @@ void FileSystemView::extract(const QModelIndex &index)
 	if (!dir.isEmpty()) {
 		QGuiApplication::setOverrideCursor(Qt::WaitCursor);
 		QByteArray u = dir.toUtf8();
-		arc_extract_all(ar, u, &dialog.opt);
+		bool r = arc_extract_all(ar, u, &dialog.opt);
 		QGuiApplication::restoreOverrideCursor();
+		if (!r)
+			GElf::error("Error extracting archive");
 	}
 
 	archive_close(ar);

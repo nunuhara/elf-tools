@@ -111,7 +111,7 @@ uint8_t *mdd_render(uint8_t *data, size_t size, size_t *size_out)
 	for (unsigned frame = 0; frame < mov.nr_frames; frame++) {
 		struct cg *cg = render_frame(&mov, frame);
 		if (!msf_gif_frame(&gif_state, cg->pixels, 8, 16, mov.w * 4))
-			ERROR("msf_gif_frame");
+			sys_warning("failed to add frame %u to gif", frame);
 		cg_free(cg);
 	}
 	MsfGifResult gif = msf_gif_end(&gif_state);
