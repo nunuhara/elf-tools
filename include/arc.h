@@ -26,6 +26,7 @@
 #include "nulib/string.h"
 #include "nulib/vector.h"
 #include "ai5/arc.h"
+#include "ai5/game.h"
 
 enum arc_manifest_type {
 	ARC_MF_INVALID,
@@ -48,7 +49,31 @@ struct arc_manifest {
 struct arc_manifest *arc_manifest_parse(const char *path);
 void arc_manifest_free(struct arc_manifest *mf);
 
-enum ai5_game_id;
+enum archive_data_type {
+	ARC_OTHER,
+	ARC_MES,
+	ARC_DATA,
+	ARC_AUDIO,
+};
+
+struct arc_extract_options {
+	bool raw;
+	bool mes_text;
+	bool mes_flat;
+	int mes_name_fun;
+};
+#define ARC_EXTRACT_DEFAULT (struct arc_extract_options) { \
+	.raw = false, \
+	.mes_text = false, \
+	.mes_flat = false, \
+	.mes_name_fun = -1, \
+}
+
+enum archive_data_type arc_data_type(const char *path);
 bool arc_is_compressed(const char *path, enum ai5_game_id game_id);
+void arc_extract_one(struct archive *arc, const char *name, const char *output_file,
+		struct arc_extract_options *opt);
+void arc_extract_all(struct archive *arc, const char *_output_dir,
+		struct arc_extract_options *opt);
 
 #endif

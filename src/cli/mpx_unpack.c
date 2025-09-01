@@ -26,40 +26,11 @@
 #include "nulib/string.h"
 
 #include "cli.h"
+#include "map.h"
 
 enum {
 	LOPT_OUTPUT = 256,
 };
-
-static void mpx_print(struct port *out, struct buffer *in)
-{
-	uint16_t nr_cols = buffer_read_u16(in);
-	uint16_t nr_rows = buffer_read_u16(in);
-
-	for (unsigned row = 0; row < nr_rows; row++) {
-		for (unsigned col = 0; col < nr_cols; col++) {
-			if (buffer_remaining(in) < 5) {
-				WARNING("MPX file truncated at (%u,%u)?", col, row);
-				return;
-			}
-			uint16_t bg_tileno = buffer_read_u16(in);
-			uint16_t fg_tileno = buffer_read_u16(in);
-			uint8_t flags = buffer_read_u8(in);
-			const char *prefix = col ? "|" : "";
-			if (bg_tileno == 0xffff && fg_tileno == 0xffff)
-				port_printf(out, "%s----,----,%2x ", prefix, flags);
-			else if (bg_tileno == 0xffff)
-				port_printf(out, "%s----,%4u,%2x ", prefix, fg_tileno, flags);
-			else if (fg_tileno == 0xffff)
-				port_printf(out, "%s%4u,----,%2x ", prefix, bg_tileno, flags);
-			else
-				port_printf(out, "%s%4u,%4u,%2x ", prefix, bg_tileno, fg_tileno, flags);
-		}
-		port_putc(out, '\n');
-	}
-	if (!buffer_end(in))
-		WARNING("Junk at end of MPX file?");
-}
 
 static int cli_mpx_unpack(int argc, char *argv[])
 {

@@ -24,6 +24,7 @@
 
 #include "cli.h"
 #include "mes.h"
+#include "version.h"
 
 enum ai5_game_id target_game = GAME_ISAKU;
 
@@ -202,6 +203,8 @@ struct game_name {
 
 int main(int argc, char *argv[])
 {
+	command_set_program_name("elf-tools");
+	command_set_program_version(ELF_TOOLS_VERSION);
 	if (argc < 2) {
 		command_print_usage(&cmd_elf);
 		exit(0);

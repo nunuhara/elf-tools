@@ -34,263 +34,6 @@
 #include "mdd.h"
 #include "mes.h"
 
-static bool raw = false;
-static bool mes_text = false;
-static bool mes_flat = false;
-static int mes_name_fun = -1;
-
-static bool open_output_file(const char *path, struct port *out)
-{
-	if (!path) {
-		port_file_init(out, stdout);
-		return true;
-	}
-	if (!port_file_open(out, path)) {
-		WARNING("port_file_open: %s", strerror(errno));
-		return false;
-	}
-	return true;
-}
-
-static bool extract_raw(struct archive_data *data, const char *output_file)
-{
-	struct port out;
-	if (!open_output_file(output_file, &out))
-		return false;
-	if (!port_write_bytes(&out, data->data, data->size)) {
-		WARNING("port_write_bytes: %s", strerror(errno));
-		port_close(&out);
-		return false;
-	}
-	port_close(&out);
-	return true;
-}
-
-static bool extract_mes(struct archive_data *data, const char *output_file)
-{
-	struct port out;
-	if (!open_output_file(output_file, &out))
-		return false;
-
-	mes_clear_labels();
-
-	if (mes_flat || mes_text) {
-		mes_statement_list statements = vector_initializer;
-		if (!mes_parse_statements(data->data, data->size, &statements)) {
-			sys_warning("Failed to parse .mes file \"%s\".\n", data->name);
-			port_close(&out);
-			return false;
-		}
-		if (mes_flat) {
-			mes_flat_statement_list_print(statements, &out);
-		} else {
-			// write text file
-			mes_text_print(statements, &out, mes_name_fun);
-			// write mes file
-			string mes_file = file_replace_extension(output_file, "MES.IN");
-			if (!extract_raw(data, mes_file))
-				sys_warning("Failed to write .mes file \"%s\".\n", mes_file);
-			string_free(mes_file);
-		}
-		mes_statement_list_free(statements);
-		port_close(&out);
-		return true;
-	}
-
-	mes_ast_block toplevel = vector_initializer;
-	if (!(mes_decompile(data->data, data->size, &toplevel))) {
-		sys_warning("Failed to decompile .mes file \"%s\".\n", data->name);
-		port_close(&out);
-		return false;
-	}
-	mes_ast_block_print(toplevel, mes_name_fun, &out);
-	mes_ast_block_free(toplevel);
-	port_close(&out);
-	return true;
-}
-
-static bool extract_cg(struct archive_data *data, const char *output_file)
-{
-	char name[512];
-	snprintf(name, 512, "%s.PNG", output_file);
-	struct port out;
-	if (!open_output_file(name, &out))
-		return false;
-
-	struct cg *cg = cg_load_arcdata(data);
-	if (!cg) {
-		sys_warning("Failed to decode image file \"%s\".\n", data->name);
-		port_close(&out);
-		return false;
-	}
-	if (!cg_write(cg, out.file, CG_TYPE_PNG)) {
-		sys_warning("Failed to encode image file.\n");
-		cg_free(cg);
-		port_close(&out);
-		return false;
-	}
-
-	cg_free(cg);
-	port_close(&out);
-	return true;
-}
-
-static bool extract_anim(struct archive_data *data, const char *output_file)
-{
-	struct port out;
-	if (!open_output_file(output_file, &out))
-		return false;
-
-	struct anim *anim = anim_parse(data->data, data->size);
-	if (!anim) {
-		sys_warning("Failed to decompile animation file \"%s\".\n", data->name);
-		port_close(&out);
-		return false;
-	}
-	anim_print(&out, anim);
-	anim_free(anim);
-	port_close(&out);
-	return true;
-}
-
-static bool extract_movie(struct archive_data *data, const char *output_file)
-{
-	char name[512];
-	snprintf(name, 512, "%s.GIF", output_file);
-	struct port out;
-	if (!open_output_file(name, &out))
-		return false;
-
-	size_t size;
-	uint8_t *gif = mdd_render(data->data, data->size, &size);
-	if (!gif) {
-		sys_warning("Failed to render movie file \"%s\".\n", data->name);
-		port_close(&out);
-		return false;
-	}
-	port_write_bytes(&out, gif, size);
-	port_close(&out);
-	free(gif);
-	return true;
-}
-
-static bool ext_is_cg(const char *ext)
-{
-	static const char * const cg_ext[] = {
-		"AKB", "GP8", "G16", "G24", "G32", "GCC", "GPR", "GPX"
-	};
-	for (unsigned i = 0; i < ARRAY_SIZE(cg_ext); i++) {
-		if (!strcasecmp(ext, cg_ext[i]))
-			return true;
-	}
-	return false;
-}
-
-static bool extract_file(struct archive_data *data, const char *output_file)
-{
-	// XXX: hack for encrypted mes files in Kisaku
-	const char *ext = file_extension(data->name);
-	if (ai5_target_game == GAME_KISAKU && !strcasecmp(ext, "MES")) {
-		for (size_t i = 0; i < data->size; i++) {
-			data->data[i] ^= 0x55;
-		}
-	}
-
-	if (raw)
-		return extract_raw(data, output_file);
-	if (!strcasecmp(ext, "MES") || !strcasecmp(ext, "LIB"))
-		return extract_mes(data, output_file);
-	if (ext_is_cg(ext))
-		return extract_cg(data, output_file);
-	if (!strcasecmp(ext, "S4") || !strcasecmp(ext, "A"))
-		return extract_anim(data, output_file);
-	if (!strcasecmp(ext, "MDD"))
-		return extract_movie(data, output_file);
-	return extract_raw(data, output_file);
-}
-
-static void extract_one(struct archive *arc, const char *name, const char *output_file)
-{
-	struct archive_data *data = archive_get(arc, name);
-	if (!data)
-		sys_error("Failed to read file \"%s\" from archive.\n", name);
-	if (!extract_file(data, output_file))
-		sys_error("failed to write output file");
-
-	archive_data_release(data);
-}
-
-// Add a trailing slash to a path
-static char *output_dir_path(const char *path)
-{
-	if (!path || *path == '\0')
-		return xstrdup("./"); // default is cwd
-
-	size_t size = strlen(path);
-	if (path[size-1] == '/')
-		return xstrdup(path);
-
-	char *s = xmalloc(size + 2);
-	strcpy(s, path);
-	s[size] = '/';
-	s[size+1] = '\0';
-	return s;
-}
-
-static string make_output_path(string dir, const char *name, const char *ext)
-{
-	string out_name = file_replace_extension(name, ext);
-	dir = string_concat(dir, out_name);
-	string_free(out_name);
-	return dir;
-}
-
-static string get_output_path(const char *dir, const char *name)
-{
-	string path = string_new(dir);
-	if (raw)
-		return string_concat_cstring(path, name);
-
-	const char *ext = file_extension(name);
-	if (!strcasecmp(ext, "MES") || !strcasecmp(ext, "LIB")) {
-		if (mes_text)
-			return make_output_path(path, name, "TXT");
-		return make_output_path(path, name, "SMES");
-	}
-	if (!strcasecmp(ext, "G16") || !strcasecmp(ext, "G24") || !strcasecmp(ext, "G32"))
-		return make_output_path(path, name, "PNG");
-	if (!strcasecmp(ext, "S4") || !strcasecmp(ext, "A"))
-		return make_output_path(path, name, "SA");
-	return string_concat_cstring(path, name);
-}
-
-static void extract_all(struct archive *arc, const char *_output_dir)
-{
-	char *output_dir = output_dir_path(_output_dir);
-	if (mkdir_p(output_dir) < 0) {
-		sys_error("Failed to create output directory: %s.\n", strerror(errno));
-	}
-
-	struct archive_data *data;
-	archive_foreach(data, arc) {
-		if (!archive_data_load(data)) {
-			sys_warning("Failed to read file \"%s\" from archive\n", data->name);
-			continue;
-		}
-		string output_file = get_output_path(output_dir, data->name);
-		sys_message("%s... ", output_file);
-		if (extract_file(data, output_file)) {
-			sys_message("OK\n");
-		} else {
-			sys_warning("failed to extract file \"%s\"\n", data->name);
-		}
-		string_free(output_file);
-		archive_data_release(data);
-	}
-
-	free(output_dir);
-}
-
 enum {
 	LOPT_OUTPUT = 256,
 	LOPT_GAME,
@@ -307,6 +50,7 @@ enum {
 
 int arc_extract(int argc, char *argv[])
 {
+	struct arc_extract_options opt = ARC_EXTRACT_DEFAULT;
 	const char *output_file = NULL;
 	const char *name = NULL;
 	bool key = false;
@@ -331,7 +75,7 @@ int arc_extract(int argc, char *argv[])
 			name = optarg;
 			break;
 		case LOPT_RAW:
-			raw = true;
+			opt.raw = true;
 			break;
 		case LOPT_DECOMPRESS:
 			decompress = true;
@@ -340,13 +84,13 @@ int arc_extract(int argc, char *argv[])
 			no_decompress = true;
 			break;
 		case LOPT_MES_FLAT:
-			mes_flat = true;
+			opt.mes_flat = true;
 			break;
 		case LOPT_MES_TEXT:
-			mes_text = true;
+			opt.mes_text = true;
 			break;
 		case LOPT_MES_NAME:
-			mes_name_fun = atoi(optarg);
+			opt.mes_name_fun = atoi(optarg);
 			break;
 		case LOPT_KEY:
 			key = true;
@@ -373,9 +117,9 @@ int arc_extract(int argc, char *argv[])
 		NOTICE("%08x%08x%02x%02x", arc->meta.offset_key, arc->meta.size_key,
 				arc->meta.name_key, arc->meta.name_length);
 	} else if (name) {
-		extract_one(arc, name, output_file);
+		arc_extract_one(arc, name, output_file, &opt);
 	} else {
-		extract_all(arc, output_file);
+		arc_extract_all(arc, output_file, &opt);
 	}
 
 	archive_close(arc);

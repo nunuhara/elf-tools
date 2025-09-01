@@ -25,24 +25,11 @@
 #include "nulib/string.h"
 
 #include "cli.h"
+#include "map.h"
 
 enum {
 	LOPT_OUTPUT = 256,
 };
-
-static void eve_print(struct port *out, uint8_t *data, size_t data_size)
-{
-	port_printf(out, "  ID,     X,     Y,    CX,    CY, UK\n");
-	for (unsigned off = 0; off + 12 < data_size; off += 12) {
-		port_printf(out, "%4u, %5u, %5u, %5u, %5u, %2u\n",
-				le_get16(data, off),
-				le_get16(data, off+2),
-				le_get16(data, off+4),
-				le_get16(data, off+6),
-				le_get16(data, off+8),
-				data[off+10]);
-	}
-}
 
 static int cli_eve_unpack(int argc, char *argv[])
 {

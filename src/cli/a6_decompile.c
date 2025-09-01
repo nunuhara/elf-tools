@@ -25,60 +25,13 @@
 #include "ai5/a6.h"
 #include "ai5/cg.h"
 
+#include "a6.h"
 #include "cli.h"
 
 enum {
 	LOPT_OUTPUT = 256,
 	LOPT_IMAGE,
 };
-
-static void a6_dims(a6_array a, unsigned *w, unsigned *h)
-{
-	unsigned w_max = 0;
-	unsigned h_max = 0;
-	struct a6_entry *e;
-	vector_foreach_p(e, a) {
-		w_max = max(w_max, e->x_right + 1);
-		h_max = max(h_max, e->y_bot + 1);
-	}
-	*w = w_max;
-	*h = h_max;
-}
-
-static struct cg *a6_to_image(a6_array a)
-{
-	unsigned w, h;
-	a6_dims(a, &w, &h);
-
-	if (w == 0 || w > 1920)
-		sys_error("Invalid width for image: %u\n", w);
-	if (h == 0 || h > 1080)
-		sys_error("Invalid height for image: %u\n", h);
-
-	struct cg *cg = cg_alloc_indexed(w, h);
-	cg->palette[4] = 255;
-	cg->palette[5] = 255;
-	cg->palette[6] = 255;
-
-	struct a6_entry *e;
-	vector_foreach_p(e, a) {
-		if (e->x_left > e->x_right || e->y_top > e->y_bot)
-			sys_error("Invalid rectangle: (%u,%u,%u,%u)", e->x_left, e->y_top,
-					e->x_right, e->y_bot);
-		unsigned x = e->x_left;
-		unsigned y = e->y_top;
-		unsigned w = (e->x_right - e->x_left) + 1;
-		unsigned h = (e->y_bot - e->y_top) + 1;
-
-		uint8_t *base = cg->pixels + y * cg->metrics.w + x;
-		for (int row = 0; row < h; row++) {
-			uint8_t *dst = base + row * cg->metrics.w;
-			memset(dst, 1, w);
-		}
-	}
-
-	return cg;
-}
 
 static int cli_a6_decompile(int argc, char *argv[])
 {
@@ -120,7 +73,7 @@ static int cli_a6_decompile(int argc, char *argv[])
 	if (image) {
 		struct cg *cg = a6_to_image(a6);
 		if (!cg)
-			sys_error("Failed to encode image");
+			sys_error("Failed to render image");
 		if (!output_file)
 			output_file = file_replace_extension(path_basename(argv[0]), "PNG");
 		FILE *out = file_open_utf8(output_file, "wb");
