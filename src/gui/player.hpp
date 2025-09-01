@@ -27,7 +27,7 @@ class Player : public QWidget
 {
 	Q_OBJECT
 public:
-	explicit Player(const QString &path, QWidget *parent = nullptr);
+	explicit Player(const QString &path, QIODevice *stream, QWidget *parent = nullptr);
 	~Player();
 private slots:
 	void seek(int mseconds);

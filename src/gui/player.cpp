@@ -19,16 +19,13 @@
 #include "player.hpp"
 #include "player_controls.hpp"
 
-// XXX: player->setMedia with a QIODevice gets stuck on LoadingMedia... apparently this is a
-//      limit of the gstreamer integration in Qt5 (supposedly fixed in Qt6?). So we can only
-//      play audio from files from disk.
-Player::Player(const QString &path, QWidget *parent) : QWidget(parent)
+Player::Player(const QString &path, QIODevice *stream, QWidget *parent) : QWidget(parent)
 {
 	player = new QMediaPlayer(this);
 	controls = new PlayerControls(player);
 	connect(player, &QMediaPlayer::mediaStatusChanged, this, &Player::statusChanged);
 
-	player->setMedia(QUrl::fromLocalFile(path));
+	player->setMedia(QUrl::fromLocalFile(path), stream);
 	controls->setState(player->state());
 
 	connect(controls, &PlayerControls::play, player, &QMediaPlayer::play);

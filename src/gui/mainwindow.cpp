@@ -217,23 +217,15 @@ void MainWindow::openGif(const QString &name, const uint8_t *data, size_t size, 
 void MainWindow::openMedia(const QString &name, const uint8_t *data, size_t size,
 		FileFormat format, bool newTab)
 {
-	QTemporaryFile *tmpfile = new QTemporaryFile(QString("XXXXXX.%1").arg(fileFormatToExtension(format)));
-	if (!tmpfile->open()) {
-		GElf::error(tr("Failed to create temp file"));
-		return;
-	}
-	if (tmpfile->write((const char*)data, size) != (qint64)size) {
-		GElf::error(tr("Failed to write temp file"));
-		return;
-	}
-	tmpfile->close();
-
-	Player *player = new Player(tmpfile->fileName());
-
-	connect(player, &QObject::destroyed, [tmpfile](QObject *obj) {
-		delete tmpfile;
+	QByteArray *bytes = new QByteArray((const char*)data, size);
+	QBuffer *buffer = new QBuffer(bytes);
+	buffer->open(QIODevice::ReadOnly);
+	buffer->seek(0);
+	Player *player = new Player(name, buffer);
+	connect(player, &QObject::destroyed, [bytes, buffer](QObject *obj) {
+		delete buffer;
+		delete bytes;
 	});
-
 	openViewer(name, player, newTab);
 }
 
