@@ -1,0 +1,1 @@
+#define ELF_TOOLS_VERSION "@VCS_TAG@"
