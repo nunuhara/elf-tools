@@ -4,12 +4,10 @@ add_project_arguments('-D_DEFAULT_SOURCE', language : 'c')
 libai5_proj = subproject('libai5')
 libai5_dep = libai5_proj.get_variable('libai5_dep')
 
-png = dependency('libpng')
-
 flex = find_program('flex')
 bison = find_program('bison')
 
-tool_deps = [libai5_dep, png]
+tool_deps = [libai5_dep]
 
 flexgen = generator(flex,
                     output : '@BASENAME@.yy.c',
