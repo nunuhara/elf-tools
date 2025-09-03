@@ -18,6 +18,8 @@
 #include <QContextMenuEvent>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QSortFilterProxyModel>
+#include <QTextStream>
 #include "gelf.hpp"
 #include "navigator_view.hpp"
 
@@ -26,11 +28,45 @@ extern "C" {
 #include "nulib/string.h"
 }
 
+static size_t readBytes(QString &str)
+{
+	size_t i;
+	float f;
+	if (str.endsWith(" B")) {
+		QTextStream(&str) >> i;
+	} else if (str.endsWith(" KB")) {
+		QTextStream(&str) >> f;
+		i = f * 1000;
+	} else if (str.endsWith(" MB")) {
+		QTextStream(&str) >> f;
+		i = f * 1000000;
+	} else {
+		i = 0;
+	}
+	return i;
+}
+
+bool NavigatorProxyModel::lessThan(const QModelIndex &left, const QModelIndex &right) const
+{
+	QString a = sourceModel()->data(left).toString();
+	QString b = sourceModel()->data(right).toString();
+	if (left.column() != 1)
+		return QString::localeAwareCompare(a, b) < 0;
+
+	size_t a_bytes = readBytes(a);
+	size_t b_bytes = readBytes(b);
+	return a_bytes < b_bytes;
+}
+
 NavigatorView::NavigatorView(NavigatorModel *model, QWidget *parent)
 	: QTreeView(parent)
 	, model(model)
 {
-	setModel(model);
+	proxy = new NavigatorProxyModel(this);
+	proxy->setSourceModel(model);
+	setModel(proxy);
+	sortByColumn(0, Qt::AscendingOrder);
+	setSortingEnabled(true);
 	connect(this, &QTreeView::activated, this, &NavigatorView::requestOpen);
 }
 
@@ -49,7 +85,8 @@ void NavigatorView::requestOpen(const QModelIndex &index) const
 	if (!index.isValid())
 		return;
 
-	NavigatorNode *node = getNode(index);
+	QModelIndex sourceIndex = proxy->mapToSource(index);
+	NavigatorNode *node = getNode(sourceIndex);
 	if (!node)
 		return;
 
@@ -66,25 +103,19 @@ void NavigatorView::exportNode(NavigatorNode *node)
 	QString ext = QFileInfo(filename).suffix();
 	FileFormat format = extensionToFileFormat(ext);
 	if (!supportedFormats.contains(format)) {
-		QMessageBox::critical(this, "elf-tools",
-				QString("%1 is not a supported export format for this file type").arg(ext),
-				QMessageBox::Ok);
+		GElf::error(QString("%1 is not a supported export format for this file type").arg(ext));
 		return;
 	}
 
 	struct port port;
 	QByteArray u = filename.toUtf8();
 	if (!port_file_open(&port, u)) {
-		QMessageBox::critical(this, "elf-tools",
-				QString("Failed to open file '%1'").arg(filename),
-				QMessageBox::Ok);
+		GElf::error(QString("Failed to open file '%1'").arg(filename));
 		return;
 	}
 
 	if (!node->write(&port, format)) {
-		QMessageBox::critical(this, "elf-tools",
-				QString("Failed to write to file '%1'").arg(filename),
-				QMessageBox::Ok);
+		GElf::error(QString("Failed to write to file '%1'").arg(filename));
 	}
 
 	port_close(&port);
@@ -98,7 +129,9 @@ void NavigatorView::contextMenuEvent(QContextMenuEvent *event)
 	if (!index.isValid())
 		return;
 
-	NavigatorNode *node = getNode(index);
+	QModelIndex sourceIndex = proxy->mapToSource(index);
+
+	NavigatorNode *node = getNode(sourceIndex);
 	if (!node)
 		return;
 

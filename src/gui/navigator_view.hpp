@@ -18,7 +18,16 @@
 #define GELF_NAVIGATOR_VIEW_HPP
 
 #include <QTreeView>
+#include <QSortFilterProxyModel>
 #include "navigator_model.hpp"
+
+class NavigatorProxyModel : public QSortFilterProxyModel
+{
+	Q_OBJECT
+public:
+	NavigatorProxyModel(QObject *parent = nullptr) : QSortFilterProxyModel(parent) {};
+	bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
+};
 
 class NavigatorView : public QTreeView
 {
@@ -35,6 +44,7 @@ protected:
 private:
 	void exportNode(NavigatorNode *node);
 	NavigatorModel *model;
+	NavigatorProxyModel *proxy;
 };
 
 #endif // GELF_NAVIGATOR_VIEW_HPP

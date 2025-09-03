@@ -89,26 +89,22 @@ QString NavigatorNode::getName() const
 	return "?";
 }
 
-QVariant NavigatorNode::getType() const
-{
-	switch (type) {
-		case RootNode:
-			return "Type";
-		case BranchNode:
-		case FileNode:
-			break;
-	}
-	return QVariant();
-}
-
-QVariant NavigatorNode::getValue() const
+QVariant NavigatorNode::getSize() const
 {
 	switch (type) {
 	case RootNode:
-		return "Value";
+		return "Size";
 	case BranchNode:
+		return QVariant();
 	case FileNode:
-		break;
+		if (ar.file->raw_size >= 1000000) {
+			float mbs = ar.file->raw_size / 1000000.f;
+			return QString::asprintf("%.2f MB", mbs);
+		} else if (ar.file->raw_size >= 1000) {
+			float kbs = ar.file->raw_size / 1000.f;
+			return QString::asprintf("%.2f KB", kbs);
+		}
+		return QString("%1 B").arg(ar.file->raw_size);
 	}
 	return QVariant();
 }

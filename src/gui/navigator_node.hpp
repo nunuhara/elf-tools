@@ -71,14 +71,9 @@ public:
 	QString getName() const;
 
 	/*
-	 * Get the type name of the node.
+	 * Get the size of the node in bytes
 	 */
-	QVariant getType() const;
-
-	/*
-	 * Get the value of the node.
-	 */
-	QVariant getValue() const;
+	QVariant getSize() const;
 };
 
 #endif // GELF_NAVIGATOR_NODE_HPP

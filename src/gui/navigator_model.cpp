@@ -15,6 +15,8 @@
  */
 
 #include <cstring>
+#include <functional>
+#include <algorithm>
 #include "navigator_model.hpp"
 
 extern "C" {
@@ -38,6 +40,7 @@ NavigatorModel::Node *NavigatorModel::Node::fromArchive(struct archive *ar,
 		child->node.ar.game = game;
 		root->appendChild(child);
 	}
+
 	return root;
 }
 
@@ -91,7 +94,7 @@ int NavigatorModel::Node::childCount()
 
 int NavigatorModel::Node::columnCount()
 {
-	return 3;
+	return 2;
 }
 
 QVariant NavigatorModel::Node::data(int column) const
@@ -99,9 +102,7 @@ QVariant NavigatorModel::Node::data(int column) const
 	if (column == 0) {
 		return node.getName();
 	} else if (column == 1) {
-		return node.getType();
-	} else if (column == 2) {
-		return node.getValue();
+		return node.getSize();
 	}
 	return QVariant();
 }
