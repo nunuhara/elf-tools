@@ -198,13 +198,13 @@ static void write_entry_NSO(struct port *out, struct arc_file *f, struct arc_met
 {
 	write_entry_name(out, f, meta);
 	write_u32(out, f->packed_size ^ meta->size_key);
-	write_u32(out, f->packed_offset ^ meta->size_key);
+	write_u32(out, f->packed_offset ^ meta->offset_key);
 }
 
 static void write_entry_NOS(struct port *out, struct arc_file *f, struct arc_metadata *meta)
 {
 	write_entry_name(out, f, meta);
-	write_u32(out, f->packed_offset ^ meta->size_key);
+	write_u32(out, f->packed_offset ^ meta->offset_key);
 	write_u32(out, f->packed_size ^ meta->size_key);
 }
 
@@ -471,7 +471,7 @@ enum {
 static int cli_arc_pack(int argc, char *argv[])
 {
 	struct arc_metadata meta = {
-		.name_length = 20,
+		NAME_OFFSET_SIZE(20),
 		.offset_key  = 0x55aa55aa,
 		.size_key    = 0xaa55aa55,
 		.name_key    = 0x55,
