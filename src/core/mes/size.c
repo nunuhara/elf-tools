@@ -22,6 +22,18 @@
 #include "ai5/game.h"
 #include "mes.h"
 
+static bool need_immediate_rand(enum ai5_game_id game)
+{
+	switch (game) {
+	case GAME_DOUKYUUSEI:
+	case GAME_DOUKYUUSEI2:
+	case GAME_KAKYUUSEI:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static uint32_t _expression_size(struct mes_expression *expr)
 {
 	uint32_t len = 1;
@@ -56,7 +68,7 @@ static uint32_t _expression_size(struct mes_expression *expr)
 		len += _expression_size(expr->sub_a) + _expression_size(expr->sub_b);
 		break;
 	case MES_EXPR_RAND:
-		if (ai5_target_game == GAME_DOUKYUUSEI) {
+		if (need_immediate_rand(ai5_target_game)) {
 			len += 2;
 		} else {
 			len += _expression_size(expr->sub_a);

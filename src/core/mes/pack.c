@@ -77,9 +77,21 @@ void pack_string(struct buffer *mes, const string text, bool terminated, uint8_t
 		buffer_write_u8(mes, term);
 }
 
+static bool need_immediate_rand(enum ai5_game_id game)
+{
+	switch (game) {
+	case GAME_DOUKYUUSEI:
+	case GAME_DOUKYUUSEI2:
+	case GAME_KAKYUUSEI:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static void _pack_expression(struct buffer *mes, struct mes_expression *expr)
 {
-	if (expr->op == MES_EXPR_RAND && ai5_target_game == GAME_DOUKYUUSEI) {
+	if (expr->op == MES_EXPR_RAND && need_immediate_rand(ai5_target_game)) {
 		assert(expr->sub_a);
 		buffer_write_u8(mes, mes_expr_opcode(MES_EXPR_RAND));
 		switch (expr->sub_a->op) {
