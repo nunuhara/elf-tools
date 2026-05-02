@@ -104,6 +104,7 @@ static bool draw_call_eq(struct anim_draw_call *a, struct anim_draw_call *b)
 				&& anim_size_eq(&a->copy.dim, &b->copy.dim);
 	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
 	case ANIM_DRAW_OP_COMPOSE:
+	case ANIM_DRAW_OP_COPY_MASKED2:
 	case ANIM_DRAW_OP_0x61_COMPOSE:
 	case ANIM_DRAW_OP_0x64_COMPOSE_MASKED:
 	case ANIM_DRAW_OP_0x65_COMPOSE:
@@ -180,11 +181,11 @@ static struct anim_instruction make_copy(enum anim_draw_opcode op, struct anim_t
 	return make_draw_call(&call);
 }
 
-static struct anim_instruction make_compose(struct anim_target bg, struct anim_target fg,
-			struct anim_target dst, struct anim_size size)
+static struct anim_instruction make_compose(enum anim_draw_opcode op, struct anim_target bg,
+			struct anim_target fg, struct anim_target dst, struct anim_size size)
 {
 	struct anim_draw_call call = {
-		.op = ANIM_DRAW_OP_COMPOSE,
+		.op = op,
 		.compose = {
 			.fg = fg,
 			.bg = bg,
@@ -240,11 +241,17 @@ static long parse_int(string str)
 	return i;
 }
 
-static uint32_t parse_uX(string str, unsigned limit)
+static uint32_t _parse_uX(string str, unsigned limit)
 {
 	long i = parse_int(str);
 	if (i < 0 || i > limit)
 		PARSE_ERROR("value out of range: %s (valid range is [0, %u])", str, limit);
+	return i;
+}
+
+static uint32_t parse_uX(string str, unsigned limit)
+{
+	uint32_t i = _parse_uX(str, limit);
 	string_free(str);
 	return i;
 }
@@ -271,10 +278,11 @@ static uint16_t parse_u16(string str)
 
 static uint16_t parse_x_dim(string str)
 {
-	uint16_t n = parse_uX(str, 2040);
-	if (n & 7) {
+	uint16_t n = _parse_uX(str, 65535);
+	if (anim_type == ANIM_S4 && n & 7) {
 		WARNING("X dimension will be truncated to multiple of 8: %s", str);
 	}
+	string_free(str);
 	return n;
 }
 
@@ -389,11 +397,11 @@ static struct anim_palette make_palette(string no, anim_color_list colors)
 %token	<string>	I_CONSTANT C_CONSTANT
 %token	<token>		ARROW STREAM PALETTE NOOP CHECK_STOP STALL RESET HALT LOOP_START
 %token	<token>		LOOP_END LOOP2_START LOOP2_END LOAD_PALETTE COPY COPY_MASKED SWAP
-%token	<token>		SET_COLOR COMPOSE FILL SET_PALETTE INVALID_TOKEN
+%token	<token>		SET_COLOR COMPOSE COPY_MASKED2 FILL SET_PALETTE INVALID_TOKEN
 
 %type	<stream>	stream instructions
 %type	<instruction>	instruction
-%type	<draw_op>	copy_fun
+%type	<draw_op>	copy_fun compose_fun
 %type	<target>	target
 %type	<size>		size
 %type	<color>		color
@@ -457,8 +465,8 @@ instruction
 	{ $$ = make_fill($2, $4); }
 	| copy_fun target ARROW target '@' size ';'
 	{ $$ = make_copy($1, $2, $4, $6); }
-	| COMPOSE target '+' target ARROW target '@' size
-	{ $$ = make_compose($2, $4, $6, $8); }
+	| compose_fun target '+' target ARROW target '@' size ';'
+	{ $$ = make_compose($1, $2, $4, $6, $8); }
 	| SET_COLOR I_CONSTANT ARROW color ';'
 	{ $$ = make_set_color(parse_u4($2), $4); }
 	| SET_PALETTE color color color color color color color color color color color color color color color color ';'
@@ -469,6 +477,11 @@ copy_fun
 	: COPY { $$ = ANIM_DRAW_OP_COPY; }
 	| COPY_MASKED { $$ = ANIM_DRAW_OP_COPY_MASKED; }
 	| SWAP { $$ = ANIM_DRAW_OP_SWAP; }
+	;
+
+compose_fun
+	: COMPOSE { $$ = ANIM_DRAW_OP_COMPOSE; }
+	| COPY_MASKED2 { $$ = ANIM_DRAW_OP_COPY_MASKED2; }
 	;
 
 target

@@ -31,6 +31,7 @@ static enum anim_s4_draw_opcode anim_to_s4_draw_opcode(enum anim_draw_opcode op)
 	case ANIM_DRAW_OP_FILL: return ANIM_S4_DRAW_OP_FILL;
 	case ANIM_DRAW_OP_SET_PALETTE: return ANIM_S4_DRAW_OP_SET_PALETTE;
 	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
+	case ANIM_DRAW_OP_COPY_MASKED2:
 	case ANIM_DRAW_OP_0x60_COPY_MASKED:
 	case ANIM_DRAW_OP_0x61_COMPOSE:
 	case ANIM_DRAW_OP_0x62:
@@ -120,6 +121,7 @@ static void pack_s4_draw_call(struct buffer *out, struct anim_draw_call *call)
 		pack_s4_set_palette_call(out, &call->set_palette);
 		break;
 	case ANIM_DRAW_OP_COMPOSE_WITH_OFFSET:
+	case ANIM_DRAW_OP_COPY_MASKED2:
 	case ANIM_DRAW_OP_0x60_COPY_MASKED:
 	case ANIM_DRAW_OP_0x61_COMPOSE:
 	case ANIM_DRAW_OP_0x62:
@@ -165,6 +167,7 @@ static uint8_t a8_draw_call_opcode(struct anim_draw_call *call)
 	case ANIM_DRAW_OP_COPY_MASKED: return 0x20 | call->copy.dst.i | (call->copy.src.i << 1);
 	case ANIM_DRAW_OP_SWAP: return 0x30 | call->copy.dst.i | (call->copy.src.i << 1);
 	case ANIM_DRAW_OP_FILL: return 0x60 | (call->copy.src.i << 1);
+	case ANIM_DRAW_OP_COPY_MASKED2: return 0x50 | call->compose.dst.i | (call->compose.fg.i << 1) | (call->compose.bg.i << 2);
 	default:
 		ERROR("Invalid draw call: %u", call->op);
 	}
@@ -185,6 +188,9 @@ static void pack_a8_draw_call(struct buffer *out, struct anim_draw_call *call)
 		buffer_write_u16(out, call->fill.dst.y);
 		buffer_write_u16(out, call->fill.dim.w);
 		buffer_write_u16(out, call->fill.dim.h);
+		break;
+	case ANIM_DRAW_OP_COPY_MASKED2:
+		pack_a_compose_args(out, &call->compose);
 		break;
 	default:
 		ERROR("Invalid draw call: %u", call->op);
@@ -353,6 +359,7 @@ static void pack_a8_stream(struct buffer *out, anim_stream stream, anim_palette_
 		}
 		pack_s4_instruction(out, p);
 	}
+	buffer_write_u8(out, 0xff);
 }
 
 static void pack_a_stream(struct buffer *out, anim_stream stream)

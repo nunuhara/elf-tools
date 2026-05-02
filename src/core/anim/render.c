@@ -119,6 +119,10 @@ static void draw_call_clip(struct anim_draw_call *call, struct cg *src, struct c
 		copy_clip(&call->compose.fg, &call->compose.dst, &call->compose.dim,
 				TARGET(call->compose.fg), TARGET(call->compose.dst));
 		break;
+	case ANIM_DRAW_OP_COPY_MASKED2:
+		copy_clip(&call->compose.fg, &call->compose.dst, &call->compose.dim,
+				TARGET(call->compose.fg), TARGET(call->compose.dst));
+		break;
 	case ANIM_DRAW_OP_SET_COLOR:
 	case ANIM_DRAW_OP_SET_PALETTE:
 		break;
@@ -179,21 +183,35 @@ static void stream_render_direct_copy(struct anim_copy_args *call, struct cg *sr
 	}
 }
 
-static void stream_render_indexed_copy_masked(struct anim_copy_args *call, struct cg *src,
-		struct cg *dst)
+static void _stream_render_indexed_copy_masked(int src_x, int src_y, int w, int h,
+		int dst_x, int dst_y, struct cg *src, struct cg *dst)
 {
-	if (call->dim.w < 1 || call->dim.h < 1)
+	if (w < 1 || h < 1)
 		return;
-	for (int row = 0; row < call->dim.h; row++) {
-		uint8_t *src_p = px_offset(src, call->src.x, call->src.y + row);
-		uint8_t *dst_p = px_offset(dst, call->dst.x, call->dst.y + row);
-		for (int col = 0; col < call->dim.w; col++, src_p++, dst_p++) {
+	for (int row = 0; row < h; row++) {
+		uint8_t *src_p = px_offset(src, src_x, src_y + row);
+		uint8_t *dst_p = px_offset(dst, dst_x, dst_y + row);
+		for (int col = 0; col < w; col++, src_p++, dst_p++) {
 			// XXX: we assume mask color is 8
 			if (*src_p != 8)
 				*dst_p = *src_p;
 		}
 		//memcpy(dst_p, src_p, call->dim.w);
 	}
+}
+
+static void stream_render_indexed_copy_masked(struct anim_copy_args *call, struct cg *src,
+		struct cg *dst)
+{
+	_stream_render_indexed_copy_masked(call->src.x, call->src.y, call->dim.w,
+			call->dim.h, call->dst.x, call->dst.y, src, dst);
+}
+
+static void stream_render_indexed_copy_masked2(struct anim_compose_args *call, struct cg *src,
+		struct cg *dst)
+{
+	_stream_render_indexed_copy_masked(call->fg.x, call->fg.y, call->dim.w,
+			call->dim.h, call->dst.x, call->dst.y, src, dst);
 }
 
 static void stream_render_direct_copy_masked(struct anim_copy_args *call, struct cg *src,
@@ -365,6 +383,10 @@ static void stream_render_draw(struct anim_draw_call *call, struct cg *src, stru
 	case ANIM_DRAW_OP_COPY_MASKED:
 		stream_render_indexed_copy_masked(&call->copy, TARGET(call->copy.src),
 				TARGET(call->copy.dst));
+		break;
+	case ANIM_DRAW_OP_COPY_MASKED2:
+		stream_render_indexed_copy_masked2(&call->compose, TARGET(call->compose.fg),
+				TARGET(call->compose.dst));
 		break;
 	case ANIM_DRAW_OP_SWAP:
 		stream_render_indexed_swap(&call->copy, TARGET(call->copy.src),

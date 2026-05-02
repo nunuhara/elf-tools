@@ -62,6 +62,7 @@ H [a-fA-F0-9]
 "LOAD_PALETTE"     { return LOAD_PALETTE; }
 "COPY"             { return COPY; }
 "COPY_MASKED"      { return COPY_MASKED; }
+"COPY_MASKED2"     { return COPY_MASKED2; }
 "SWAP"             { return SWAP; }
 "SET_COLOR"        { return SET_COLOR; }
 "COMPOSE"          { return COMPOSE; }
