@@ -425,6 +425,12 @@ static struct arc_metadata game_keys[] = {
 		.size_key    = 0xaa55aa55,
 		.name_key    = 0x55,
 	},
+	[GAME_DOUKYUUSEI2] = {
+		NAME_SIZE_OFFSET(12),
+		.offset_key  = 0x55aa55aa,
+		.size_key    = 0xaa55aa55,
+		.name_key    = 0x55,
+	},
 	[GAME_ISAKU] = {
 		NAME_SIZE_OFFSET(20),
 		.offset_key  = 0x55aa55aa,
