@@ -267,6 +267,8 @@ static std::shared_ptr<struct archive> openArchiveFile(const QString &path, File
 	default:
 		break;
 	}
+	if (ar == nullptr)
+		return nullptr;
 	return std::shared_ptr<struct archive>(ar, archive_close);
 }
 
