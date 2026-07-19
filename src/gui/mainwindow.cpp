@@ -51,6 +51,10 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(&GElf::getInstance(), &GElf::openedText, this, &MainWindow::openTextFile);
 }
 
+MainWindow::~MainWindow()
+{
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
 	event->accept();

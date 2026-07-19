@@ -30,7 +30,13 @@ class MainWindow : public QMainWindow
 {
 	Q_OBJECT
 public:
-	MainWindow(QWidget *parent = nullptr);
+	static MainWindow& getInstance()
+	{
+		static MainWindow instance;
+		return instance;
+	}
+	MainWindow(MainWindow const&) = delete;
+	void operator=(MainWindow const&) = delete;
 protected:
 	void closeEvent(QCloseEvent *event) override;
 public slots:
@@ -46,6 +52,8 @@ private slots:
 	void status(const QString &message);
 	void closeTab(int index);
 private:
+	MainWindow(QWidget *parent = nullptr);
+	~MainWindow();
 	void createActions();
 	void createStatusBar();
 	void createDockWindows();

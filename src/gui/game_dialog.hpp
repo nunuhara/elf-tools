@@ -18,6 +18,7 @@
 #define GELF_ARCHIVE_DIALOG_HPP
 
 #include <QDialog>
+#include "mainwindow.hpp"
 
 extern "C" {
 #include "arc.h"
@@ -36,7 +37,7 @@ public:
 		ARCHIVE_OPEN,
 		ARCHIVE_EXTRACT
 	};
-	explicit GameDialog(const QString &path, DialogType type, QWidget *parent = nullptr);
+	explicit GameDialog(const QString &path, DialogType type, QWidget *parent = &MainWindow::getInstance());
 	const struct ai5_game *game = nullptr;
 	unsigned flags = 0;
 	struct arc_extract_options opt;

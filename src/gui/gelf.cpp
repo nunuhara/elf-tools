@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 	parser.addPositionalArgument("file", "The file to open.");
 	parser.process(app);
 
-	MainWindow w;
+	MainWindow& w = MainWindow::getInstance();
 	w.setWindowTitle("elf-tools");
 	if (!parser.positionalArguments().isEmpty())
 		GElf::openFile(parser.positionalArguments().first());
