@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="console-application">
+  <id>technology.haniwa.elf</id>
+  
+  <name>elf-tools CLI</name>
+  <summary>Command line tools for extracting/editing files from Elf/Silky's games.</summary>
+  
+  <metadata_license>MIT</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  
+  <description>
+    <p>
+      Command line tools for extracting/editing files from Elf/Silkys games.
+    </p>
+  </description>
+
+  <icon type="stock">utilities-terminal</icon>
+  
+  <categories>
+    <category>Development</category>
+    <category>Building</category>
+    <category>FileTools</category>
+  </categories>
+  
+  <provides>
+    <binary>elf</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/nunuhara/elf-tools</url>
+
+  <developer id="technology.haniwa">
+    <name>Nunuhara Cabbage</name>
+  </developer>
+
+</component>

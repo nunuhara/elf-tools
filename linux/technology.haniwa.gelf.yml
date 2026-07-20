@@ -1,0 +1,32 @@
+id: technology.haniwa.gelf
+runtime: org.kde.Platform
+runtime-version: "5.15-25.08"
+sdk: org.kde.Sdk
+command: gelf
+finish-args:
+  # X11 + XShm access
+  - --share=ipc
+  - --socket=fallback-x11
+  # Wayland access
+  - --socket=wayland
+  # Filesystem access
+  - --filesystem=host
+cleanup:
+  - /lib/libai5.a
+  - /bin/elf
+modules:
+  - name: gelf
+    buildsystem: meson
+    config-opts:
+      - -Dbuildtype=release
+    sources:
+      - type: git
+        url: https://github.com/nunuhara/elf-tools.git
+  - name: metadata
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/share/metainfo
+      - install -D technology.haniwa.gelf.metainfo.xml /app/share/metainfo/
+    sources:
+      - type: file
+        path: technology.haniwa.gelf.metainfo.xml

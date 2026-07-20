@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="console-application">
+  <id>technology.haniwa.gelf</id>
+  
+  <name>elf-tools GUI</name>
+  <summary>GUI tool for viewing/extracting files from Elf/Silky's games.</summary>
+  
+  <metadata_license>MIT</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  
+  <description>
+    <p>
+      GUI tool for viewing/extracting files from Elf/Silky's games.
+    </p>
+  </description>
+
+  <icon type="stock">utilities-terminal</icon>
+  
+  <categories>
+    <category>Development</category>
+    <category>FileTools</category>
+    <category>Qt</category>
+  </categories>
+  
+  <provides>
+    <binary>gelf</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/nunuhara/elf-tools</url>
+
+  <developer id="technology.haniwa">
+    <name>Nunuhara Cabbage</name>
+  </developer>
+
+</component>

@@ -1,0 +1,26 @@
+id: technology.haniwa.elf
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: elf
+finish-args:
+  # Filesystem access
+  - --filesystem=host
+cleanup:
+  - /lib/libai5.a
+modules:
+  - name: elf
+    buildsystem: meson
+    config-opts:
+      - -Dbuildtype=release
+    sources:
+      - type: git
+        url: https://github.com/nunuhara/elf-tools.git
+  - name: metadata
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/share/metainfo
+      - install -D technology.haniwa.elf.metainfo.xml /app/share/metainfo/
+    sources:
+      - type: file
+        path: technology.haniwa.elf.metainfo.xml

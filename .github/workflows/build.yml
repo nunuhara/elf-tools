@@ -1,0 +1,124 @@
+name: Build
+
+on: [push, pull_request, workflow_dispatch]
+
+env:
+  RELEASE_NAME: ${{ github.ref_type == 'tag' && github.ref_name || 'nightly' }}
+
+jobs:
+  linux-build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        build-type: ["debug", "release"]
+
+    name: Linux ${{ matrix.build-type }}
+    steps:
+    - name: Checkout Source
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive
+
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt install \
+          flex \
+          bison \
+          meson \
+          libpng-dev \
+          qtbase5-dev
+
+    - name: Build
+      run: |
+        mkdir -p out/${{ matrix.build-type }}
+        meson -Dbuildtype=${{ matrix.build-type }} out/${{ matrix.build-type }}
+        ninja -C out/${{ matrix.build-type }}
+
+  flatpak-build:
+    name: Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        submodules: recursive
+    - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      with:
+        bundle: elf-tools-cli-linux-x86_64-${{ env.RELEASE_NAME }}.flatpak
+        manifest-path: linux/technology.haniwa.elf.yml
+        cache-key: flatpak-builder-elf-${{ github.sha }}
+    - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      with:
+        bundle: elf-tools-gui-linux-x86_64-${{ env.RELEASE_NAME }}.flatpak
+        manifest-path: linux/technology.haniwa.gelf.yml
+        cache-key: flatpak-builder-gelf-${{ github.sha }}
+
+  windows-build:
+    runs-on: windows-latest
+    name: Windows
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            flex
+            bison
+            diffutils
+            zip
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-meson
+            mingw-w64-x86_64-libpng
+            mingw-w64-x86_64-qt5
+            mingw-w64-x86_64-qt5-base
+            mingw-w64-x86_64-qt5-imageformats
+            mingw-w64-x86_64-qt5-multimedia
+            mingw-w64-x86_64-qt5-tools
+
+      - name: Build
+        run: |
+          mkdir build
+          meson build -Dbuildtype=release
+          ninja -C build
+
+      - name: Deploy Qt Dependencies (for gelf)
+        run: |
+          # windeployqt-qt5 is broken?
+          cp /mingw64/bin/qmake-qt5.exe /mingw64/bin/qmake.exe
+
+          mkdir -p dist/gelf
+          cp build/gelf.exe dist/gelf/
+          windeployqt-qt5 --no-translations --no-svg --no-system-d3d-compiler --no-opengl-sw --no-angle dist/gelf/gelf.exe
+
+          # Copy MinGW dependencies
+          for dll in $(ldd dist/gelf/gelf.exe | grep mingw64 | awk '{print $3}'); do
+            cp -v "$dll" dist/gelf/ || true
+          done
+
+      - name: Package
+        run: |
+          cp build/elf.exe LICENSE *.md dist/
+          cp -r /mingw64/share/licenses dist/
+          mv dist elf-tools
+          zip -r -9 elf-tools-windows-x86_64-${{ env.RELEASE_NAME }}.zip elf-tools
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v7
+        with: 
+          name: elf-tools
+          path: |
+            elf-tools-windows-x86_64-${{ env.RELEASE_NAME }}.zip
