@@ -57,10 +57,10 @@ int main(int argc, char *argv[])
 	parser.addPositionalArgument("file", "The file to open.");
 	parser.process(app);
 
-	MainWindow& w = MainWindow::getInstance();
+	MainWindow w;
 	w.setWindowTitle("elf-tools");
 	if (!parser.positionalArguments().isEmpty())
-		GElf::openFile(parser.positionalArguments().first());
+		GElf::openFile(parser.positionalArguments().first(), false, &w);
 	w.show();
 	return app.exec();
 }
@@ -274,9 +274,9 @@ static std::shared_ptr<struct archive> openArchiveFile(const QString &path, File
 	return std::shared_ptr<struct archive>(ar, archive_close);
 }
 
-void GElf::openArchive(const QString &path, FileFormat format)
+void GElf::openArchive(const QString &path, FileFormat format, QWidget *parent)
 {
-	GameDialog dialog(path, GameDialog::DialogType::ARCHIVE_OPEN);
+	GameDialog dialog(path, GameDialog::DialogType::ARCHIVE_OPEN, parent);
 	if (dialog.exec() != QDialog::Accepted)
 		return;
 	ai5_set_game(dialog.game->name);
@@ -665,11 +665,11 @@ const struct ai5_game *GElf::getGameForFile(const QString &path)
 	return nullptr;
 }
 
-void GElf::openFile(const QString &path, bool newTab)
+void GElf::openFile(const QString &path, bool newTab, QWidget *parent)
 {
 	FileFormat format = extensionToFileFormat(QFileInfo(path).suffix());
 	if (isArchiveFormat(format)) {
-		openArchive(path, format);
+		openArchive(path, format, parent);
 		return;
 	}
 	size_t size;
@@ -685,7 +685,7 @@ void GElf::openFile(const QString &path, bool newTab)
 	case FileFormat::MES:
 	case FileFormat::A:
 	case FileFormat::S4: {
-		GameDialog dialog(path, GameDialog::DialogType::GAME_SELECT);
+		GameDialog dialog(path, GameDialog::DialogType::GAME_SELECT, parent);
 		if (dialog.exec() != QDialog::Accepted) {
 			free(data);
 			return;

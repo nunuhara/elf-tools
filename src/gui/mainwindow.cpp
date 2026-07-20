@@ -51,10 +51,6 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(&GElf::getInstance(), &GElf::openedText, this, &MainWindow::openTextFile);
 }
 
-MainWindow::~MainWindow()
-{
-}
-
 void MainWindow::closeEvent(QCloseEvent *event)
 {
 	event->accept();
@@ -64,7 +60,7 @@ void MainWindow::open()
 {
 	QString fileName = QFileDialog::getOpenFileName(this);
 	if (!fileName.isEmpty())
-		GElf::openFile(fileName);
+		GElf::openFile(fileName, false, this);
 }
 
 void MainWindow::about()

@@ -48,7 +48,7 @@ void FileSystemView::open(const QModelIndex &index, bool newTab)
 {
 	if (model->isDir(index))
 		return;
-	GElf::openFile(model->filePath(index), newTab);
+	GElf::openFile(model->filePath(index), newTab, parentWidget()->window());
 }
 
 void FileSystemView::openFile(const QModelIndex &index)

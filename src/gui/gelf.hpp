@@ -75,7 +75,7 @@ public:
 	void operator=(GElf const&) = delete;
 
 	static const struct ai5_game *getGameForFile(const QString &path);
-	static void openFile(const QString &path, bool newTab = false);
+	static void openFile(const QString &path, bool newTab, QWidget *parent = nullptr);
 	static void openArchiveData(struct archive_data *file, const struct ai5_game *game,
 			bool newTab = false);
 	static void openData(const QString &name, uint8_t *data, size_t size,
@@ -108,7 +108,7 @@ signals:
 private:
 	GElf();
 	~GElf();
-	static void openArchive(const QString &path, FileFormat format);
+	static void openArchive(const QString &path, FileFormat format, QWidget *parent = nullptr);
 	static void fileError(const QString &filename, const QString &message);
 };
 
