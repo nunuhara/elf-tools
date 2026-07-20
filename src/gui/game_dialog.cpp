@@ -35,10 +35,6 @@ GameDialog::GameDialog(const QString &arc_path, DialogType type, QWidget *parent
 
 	gameSelector = new QComboBox;
 
-	for (int i = 0; i < AI5_NR_GAME_IDS; i++) {
-		gameSelector->addItem(QString("%1 [%2]").arg(ai5_games[i].description, ai5_games[i].name));
-	}
-
 	QFormLayout *formLayout = new QFormLayout;
 	formLayout->addRow(tr("Game:"), gameSelector);
 
@@ -113,12 +109,33 @@ GameDialog::GameDialog(const QString &arc_path, DialogType type, QWidget *parent
 	layout->addWidget(buttonBox);
 	setLayout(layout);
 
+	const struct ai5_game *default_game = GElf::getGameForFile(arc_path);
+	int default_index = -1;
+	for (int i = 0; i < AI5_NR_GAME_IDS; i++) {
+		if (&ai5_games[i] == default_game)
+			default_index = i;
+		gameSelector->addItem(QString("%1 [%2]").arg(ai5_games[i].description, ai5_games[i].name));
+	}
+	if (default_index >= 0)
+		last_selected_index = default_index;
+
 	connect(gameSelector, QOverload<int>::of(&QComboBox::activated),
 			this, &GameDialog::setGame);
 	gameSelector->setCurrentIndex(last_selected_index);
 	setGame(last_selected_index);
 
-	setWindowTitle(QString("Open Archive: %1").arg(QFileInfo(path).fileName()));
+	const char *fmt = "Select Game: %1";
+	switch (type) {
+	case GAME_SELECT:
+		break;
+	case ARCHIVE_OPEN:
+		fmt = "Open Archive: %1";
+		break;
+	case ARCHIVE_EXTRACT:
+		fmt = "Extract Archive: %1";
+		break;
+	}
+	setWindowTitle(QString(fmt).arg(QFileInfo(path).fileName()));
 }
 
 void GameDialog::setGame(int i)

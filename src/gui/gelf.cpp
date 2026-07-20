@@ -29,12 +29,14 @@ extern "C" {
 #include "nulib/port.h"
 #include "nulib/string.h"
 #include "nulib/file.h"
+#include "nulib/utfsjis.h"
 #include "ai5/anim.h"
 #include "ai5/arc.h"
 #include "ai5/ccd.h"
 #include "ai5/cg.h"
 #include "ai5/game.h"
 #include "a6.h"
+#include "ini.h"
 #include "map.h"
 #include "mes.h"
 #include "mdd.h"
@@ -618,6 +620,49 @@ void GElf::openData(const QString &name, uint8_t *data, size_t size, const struc
 		openBinary(name, data, size, newTab);
 		break;
 	}
+}
+
+static int cfg_handler(void *user, const char *section, const char *name, const char *value)
+{
+	string *out = (string*)user;
+	if (!strcasecmp(section, "CONFIG") && !strcasecmp(name, "TITLE")) {
+		*out = sjis_cstring_to_utf8(value, strlen(value));
+	}
+	return 1;
+}
+
+const struct ai5_game *GElf::getGameForFile(const QString &path)
+{
+	// get ini path
+	char *p;
+	QDir dir = QFileInfo(path).dir();
+	p = path_get_icase(QFileInfo(dir, "AI5WIN.INI").filePath().toUtf8());
+	if (!p)
+		p = path_get_icase(QFileInfo(dir, "syuusaku.ini").filePath().toUtf8());
+	if (!p)
+		p = path_get_icase(QFileInfo(dir, "aiwin.ini").filePath().toUtf8());
+	if (!p)
+		return nullptr;
+
+	// get game name from ini
+	string title = nullptr;
+	if (ini_parse(p, cfg_handler, &title) < 0)
+		WARNING("Failed to read INI file \"%s\"", p);
+	free(p);
+	if (!title)
+		return nullptr;
+
+	// find game struct
+	int game_id = ai5_game_id_from_title(title);
+	string_free(title);
+	if (game_id < 0)
+		return nullptr;
+	for (int i = 0; i < AI5_NR_GAME_IDS; i++) {
+		if (ai5_games[i].id == game_id)
+			return &ai5_games[i];
+	}
+
+	return nullptr;
 }
 
 void GElf::openFile(const QString &path, bool newTab)

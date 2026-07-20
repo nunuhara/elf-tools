@@ -37,7 +37,8 @@ public:
 		ARCHIVE_OPEN,
 		ARCHIVE_EXTRACT
 	};
-	explicit GameDialog(const QString &path, DialogType type, QWidget *parent = &MainWindow::getInstance());
+	explicit GameDialog(const QString &path, DialogType type,
+			QWidget *parent = &MainWindow::getInstance());
 	const struct ai5_game *game = nullptr;
 	unsigned flags = 0;
 	struct arc_extract_options opt;

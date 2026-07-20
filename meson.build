@@ -28,6 +28,7 @@ core_sources = [
   'src/core/anim/pack.c',
   'src/core/anim/render.c',
   'src/core/arc/arc.c',
+  'src/core/ini.c',
   'src/core/map.c',
   'src/core/mdd.c',
   'src/core/mp3.c',
